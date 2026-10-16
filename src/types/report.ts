@@ -127,11 +127,27 @@ export interface ExtraStats {
   lastConfirmedContribution: DataState<string>
 }
 
+/** 上一年度同口径数据（用于指标卡同比；无法可靠获取的字段缺省，不展示估算值） */
+export interface LastYearSnapshot {
+  totalCommits?: number
+  contributionDays?: number
+  pullRequests?: number
+  issues?: number
+  reviews?: number
+  newRepositories?: number
+}
+
 /** 完整年度报告 */
 export interface YearlyReport {
   header: ReportHeader
   user: UserProfileData
   metrics: MetricCards
+  /** 贡献日历数据模式：graphql = 完整贡献口径；rest = 提交近似降级 */
+  dataMode: 'graphql' | 'rest'
+  /** 已配置 Token 但 GraphQL 贡献日历获取失败时的原因（用于提示用户排查） */
+  graphqlError?: string
+  /** 上一年度同口径数据（同比展示用，缺省字段表示不可获取） */
+  lastYear?: LastYearSnapshot
   heatmap: {
     days: HeatmapDay[]
     totalContributions: number

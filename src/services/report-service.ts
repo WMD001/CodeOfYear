@@ -35,6 +35,7 @@ import type {
   ActivityPanelData,
   ExtraStats,
   HeatmapDay,
+  LastYearSnapshot,
   MetricCards,
   ReportHeader,
   YearlyReport,
@@ -90,6 +91,63 @@ function contributionLevel(count: number, max: number): GithubContributionDay['c
   if (ratio > 0.66) return 'FOURTH_QUARTILE'
   if (ratio > 0.33) return 'THIRD_QUARTILE'
   return 'SECOND_QUARTILE'
+}
+
+/**
+ * 上一年度同口径数据（best-effort，用于指标卡同比展示）。
+ * 任一来源失败/限流时缺省对应字段，调用方据此隐藏同比行（禁止估算）。
+ * - Search API：去年创建的 PR / Issue / Review（匿名与 Token 模式均尝试）
+ * - GraphQL：去年贡献日历（仅当前年已成功使用 GraphQL 时）
+ * - 去年新建公开仓库：由当前仓库列表按 created_at 过滤
+ */
+async function loadLastYearStats(
+  username: string,
+  year: number,
+  useGraphql: boolean,
+  repos: GithubRepository[],
+): Promise<LastYearSnapshot | undefined> {
+  if (year <= 2009) return undefined // 无法获取 2008 年前的对比数据
+  const lastYear = year - 1
+  const from = yearStartDate(lastYear)
+  const to = yearEndDate(lastYear)
+  const snapshot: LastYearSnapshot = {}
+
+  // 去年新建公开仓库（当前仍可查询到的口径，与当年一致）
+  try {
+    const created = reposCreatedInYear(repos, from, to)
+    if (created.length > 0) snapshot.newRepositories = created.length
+  } catch {
+    /* 忽略，不展示同比 */
+  }
+
+  // 去年 PR / Issue / Review（Search API）
+  try {
+    const [pr, issue, review] = await Promise.all([
+      searchPullRequestStats(username, from, to),
+      searchIssueStats(username, from, to),
+      searchReviewedPrCount(username, from, to),
+    ])
+    snapshot.pullRequests = pr.total
+    snapshot.issues = issue.total
+    snapshot.reviews = review
+  } catch {
+    /* 限流或失败：忽略，不展示同比 */
+  }
+
+  // 去年贡献日历（仅 GraphQL 可用时，同当年口径）
+  if (useGraphql) {
+    try {
+      const collection = await getContributionsCollection(username, from, to)
+      snapshot.totalCommits = collection.totalCommitContributions
+      snapshot.contributionDays = collection.contributionCalendar.weeks
+        .flatMap((w) => w.contributionDays)
+        .filter((d) => d.contributionCount > 0).length
+    } catch {
+      /* 忽略，不展示同比 */
+    }
+  }
+
+  return Object.keys(snapshot).length > 0 ? snapshot : undefined
 }
 
 export async function loadYearlyReport(
@@ -172,6 +230,7 @@ export async function loadYearlyReport(
   let calendarDays: HeatmapDay[] = []
   let calendarTotal = 0
   let calendarState: 'graphql' | 'rest-fallback' = 'rest-fallback'
+  let graphqlError: string | undefined
 
   if (hasToken) {
     try {
@@ -184,8 +243,9 @@ export async function loadYearlyReport(
       calendarTotal = collection.contributionCalendar.totalContributions
       calendarState = 'graphql'
     } catch (err) {
-      // 降级到 REST 提交近似
-      console.warn(`[gyr] GraphQL 贡献日历不可用，降级为提交近似：${err instanceof Error ? err.message : err}`)
+      // 降级到 REST 提交近似，并记录原因供用户排查
+      graphqlError = err instanceof Error ? err.message : '贡献日历获取失败'
+      console.warn(`[gyr] GraphQL 贡献日历不可用，降级为提交近似：${graphqlError}`)
     }
   }
 
@@ -206,6 +266,9 @@ export async function loadYearlyReport(
     })
     calendarTotal = totalCommitsAttributed
   }
+
+  // 上一年度同口径数据（best-effort，同比展示用）
+  const lastYear = await loadLastYearStats(username, year, useGraphql, nonForkRepos)
 
   function countForDate(date: string): number {
     let n = 0
@@ -436,6 +499,9 @@ export async function loadYearlyReport(
 
   const report: YearlyReport = {
     header,
+    dataMode: useGraphql ? 'graphql' : 'rest',
+    graphqlError,
+    lastYear,
     user: {
       login: profile.login,
       displayName: profile.name,

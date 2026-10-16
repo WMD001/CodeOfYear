@@ -6,11 +6,12 @@ import { copyText, exportElementAsPng } from '../utils/export-image'
 import ReportHeader from '../components/ReportHeader'
 import MetricCards from '../components/MetricCards'
 import ContributionHeatmap from '../components/ContributionHeatmap'
+import ContributionHighlights from '../components/ContributionHighlights'
+import OtherStatsPanel from '../components/OtherStatsPanel'
 import RepositoryRanking from '../components/RepositoryRanking'
 import LanguageChart from '../components/LanguageChart'
 import CommitTrend from '../components/CommitTrend'
-import ActivityPanel from '../components/ActivityPanel'
-import ExtraStats from '../components/ExtraStats'
+import DevActivityPanel from '../components/DevActivityPanel'
 import TokenSetting from '../components/TokenSetting'
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -78,13 +79,20 @@ function ReportPage() {
         <p className="text-lg text-[#f85149]" role="alert">
           {state.message}
         </p>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap justify-center">
           <button
             type="button"
             onClick={reload}
             className="bg-[#238636] hover:bg-[#2ea043] text-white font-medium rounded-lg px-6 py-2 transition"
           >
             重试
+          </button>
+          <button
+            type="button"
+            onClick={() => setTokenOpen(true)}
+            className="border border-[#30363d] hover:border-[#3d444d] text-[#e6edf3] font-medium rounded-lg px-6 py-2 transition"
+          >
+            {tokenConfigured ? '修改 Token' : '配置 Token（可选）'}
           </button>
           <Link
             to="/"
@@ -93,6 +101,16 @@ function ReportPage() {
             返回首页
           </Link>
         </div>
+        {state.kind === 'rate_limited' && (
+          <p className="text-xs text-[#6e7681] max-w-md text-center leading-relaxed">
+            提示：配置 Token 可将请求额度提升至 5000 次/小时，保存后会自动重新加载报告
+          </p>
+        )}
+        <TokenSetting
+          open={tokenOpen}
+          onClose={() => setTokenOpen(false)}
+          onSaved={reload}
+        />
       </div>
     )
   }
@@ -125,11 +143,18 @@ function ReportPage() {
       {/* 数据模式工具条 + 导出/分享 */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-[#8b949e]">
-          {tokenConfigured ? (
+          {report.dataMode === 'graphql' ? (
             <>
               <span className="text-[#3fb950]">● 完整数据模式</span>
               <span className="ml-2 text-[#6e7681]">
                 已配置 Token，贡献日历使用 GitHub GraphQL 完整口径
+              </span>
+            </>
+          ) : tokenConfigured ? (
+            <>
+              <span className="text-[#d29922]">● 降级数据模式</span>
+              <span className="ml-2 text-[#6e7681]">
+                已配置 Token，但贡献日历获取失败，已降级为公开仓库提交近似统计
               </span>
             </>
           ) : (
@@ -177,63 +202,62 @@ function ReportPage() {
         </div>
       </div>
 
-      {/* 第一行：报告标题 */}
+      {/* 已配置 Token 但贡献日历降级时的提示 */}
+      {report.graphqlError && (
+        <div className="mb-4 border border-[#d29922]/40 bg-[#d29922]/10 rounded-lg px-4 py-2.5 text-xs text-[#d29922] leading-relaxed" role="status">
+          贡献日历降级提示：{report.graphqlError}。完整热力图需 GitHub
+          GraphQL 权限（classic Token 勾 public_repo 即可；fine-grained
+          Token 需额外授予 Account → Contributions 读取权限）。
+        </div>
+      )}
+
+      {/* 报告主体（导出 PNG 范围） */}
       <div ref={reportRef}>
+        {/* 第一行：标题 + 用户资料条 */}
         <ReportHeader header={report.header} user={report.user} />
 
-      {/* 第二行：核心指标卡片 */}
-      <section className="mt-6">
-        <MetricCards metrics={report.metrics} year={report.header.year} />
-      </section>
+        {/* 第二行：核心指标卡片（8 张，含同比） */}
+        <section className="mt-6">
+          <MetricCards
+            metrics={report.metrics}
+            year={report.header.year}
+            lastYear={report.lastYear}
+          />
+        </section>
 
-      {/* 第三行：全年贡献热力图 + 侧栏统计 */}
-      <section className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
-        <ContributionHeatmap
-          days={report.heatmap.days}
-          totalContributions={report.heatmap.totalContributions}
-          endDate={report.header.endDate}
-        />
-        <div className="flex flex-col gap-4">
-          <ActivityPanel
+        {/* 第三行：全年贡献热力图 + 右侧两面板（连续贡献/首次提交/寄语 + 年度其他数据） */}
+        <section className="mt-6 grid grid-cols-1 lg:grid-cols-[1.8fr_1fr_1fr] gap-4">
+          <ContributionHeatmap
+            days={report.heatmap.days}
+            totalContributions={report.heatmap.totalContributions}
+            endDate={report.header.endDate}
+          />
+          <ContributionHighlights
             activity={report.activity}
             year={report.header.year}
+            displayName={report.user.displayName || report.header.username}
+            username={report.header.username}
           />
-        </div>
-      </section>
+          <OtherStatsPanel extra={report.extra} />
+        </section>
 
-      {/* 第四行：年度核心分析（Top5 / 语言 / 趋势） */}
-      <section className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <RepositoryRanking data={report.topRepositories} username={username} />
-        <LanguageChart data={report.languages} />
-        <CommitTrend
-          trend={report.monthlyTrend}
-          year={report.header.year}
-          activity={report.activity}
-        />
-      </section>
+        {/* 第四行：年度核心分析（Top5 / 语言 / 趋势 / 活跃度，四列） */}
+        <section className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <RepositoryRanking data={report.topRepositories} username={username} />
+          <LanguageChart data={report.languages} />
+          <CommitTrend
+            trend={report.monthlyTrend}
+            year={report.header.year}
+            activity={report.activity}
+            languages={report.languages.stats}
+          />
+          <DevActivityPanel activity={report.activity} year={report.header.year} />
+        </section>
 
-      {/* 第五行：补充统计 */}
-      <section className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
-        <ExtraStats extra={report.extra} />
-        <div className="card p-6 flex flex-col justify-center items-center text-center">
-          <p className="text-[#8b949e] italic text-lg leading-relaxed">
-            “代码不只是工作，
-            <br />
-            更是让想法变成现实的方式。”
-          </p>
-          <p className="mt-3 text-sm text-[#6e7681]">
-            — {report.user.displayName || report.header.username}，继续加油！
-          </p>
-          <p className="mt-6 text-[#58a6ff]">
-            愿 {report.header.year + 1} 你在代码的世界里探索、创造、成长！
-          </p>
-        </div>
-      </section>
-
-      <footer className="mt-8 pb-6 text-center text-xs text-[#6e7681]">
-        数据来源：GitHub 公开 API（REST &amp; GraphQL）· 统计截止于{' '}
-        {report.header.endDate} · 仅统计可公开获取的数据
-      </footer>
+        <footer className="mt-8 pb-6 text-center text-xs text-[#6e7681]">
+          数据来源：GitHub 公开 API（REST &amp; GraphQL）· 统计截止于{' '}
+          {report.header.endDate} · 仅统计可公开获取的数据
+        </footer>
       </div>
 
       <TokenSetting

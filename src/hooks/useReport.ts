@@ -4,12 +4,13 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { loadYearlyReport } from '../services/report-service'
+import { GithubApiError } from '../api/github-errors'
 import type { YearlyReport } from '../types/report'
 
 export type ReportLoadState =
   | { phase: 'loading' }
   | { phase: 'success'; report: YearlyReport }
-  | { phase: 'error'; message: string }
+  | { phase: 'error'; message: string; kind?: string }
 
 export function useReport(username: string, year: number) {
   const [state, setState] = useState<ReportLoadState>({ phase: 'loading' })
@@ -31,7 +32,8 @@ export function useReport(username: string, year: number) {
           err instanceof Error && err.message
             ? err.message
             : '报告加载失败，请稍后重试'
-        setState({ phase: 'error', message })
+        const kind = err instanceof GithubApiError ? err.kind : undefined
+        setState({ phase: 'error', message, kind })
       })
 
     return () => {

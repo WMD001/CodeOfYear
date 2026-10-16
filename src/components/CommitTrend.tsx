@@ -1,12 +1,12 @@
 /**
- * CommitTrend：月度提交趋势（柱状图）
+ * CommitTrend：月度提交趋势（柱状图，参照设计图"提交趋势"面板）
  * - 横轴 1-12 月，纵轴提交数
  * - 当前月份统计截至当日；未来月份显示"未统计"，不填充虚构零值
  * - 悬停查看月份与提交数；突出最高提交月份
- * - 下方展示月均提交与年度提交总量
+ * - 下方统计：月均提交 / 最长连续贡献 / 常用开发语言 Top 3
  */
 import { useMemo, useRef } from 'react'
-import type { ActivityPanelData, MonthlyTrendItem } from '../types/report'
+import type { ActivityPanelData, LanguageStat, MonthlyTrendItem } from '../types/report'
 import { formatNumber } from '../utils/date'
 import { useECharts } from '../utils/echarts'
 
@@ -14,9 +14,10 @@ interface Props {
   trend: MonthlyTrendItem[]
   year: number
   activity: ActivityPanelData
+  languages: LanguageStat[]
 }
 
-export default function CommitTrend({ trend, year, activity }: Props) {
+export default function CommitTrend({ trend, year, activity, languages }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const completed = trend.filter((t) => t.isComplete && t.commits !== null)
   const total = completed.reduce((acc, t) => acc + (t.commits ?? 0), 0)
@@ -24,6 +25,7 @@ export default function CommitTrend({ trend, year, activity }: Props) {
   const streak = activity.longestStreak.value
   const values = trend.map((t) => (t.isComplete ? t.commits : null))
   const max = Math.max(...values.filter((v): v is number => v !== null), 0)
+  const topLangs = languages.slice(0, 3)
 
   const option = useMemo(() => {
     return {
@@ -107,16 +109,19 @@ export default function CommitTrend({ trend, year, activity }: Props) {
               </p>
             </div>
             <div className="bg-[#0d1117] border border-[#21262d] rounded-lg py-2.5 px-2">
-              <p className="text-xs text-[#8b949e]">年度提交总量</p>
+              <p className="text-xs text-[#8b949e]">最长连续贡献</p>
               <p className="mono-num text-lg font-semibold text-[#e6edf3] mt-0.5">
-                {formatNumber(total)}
+                {streak ? `${streak.days} 天` : '—'}
               </p>
             </div>
           </div>
 
-          {streak && (
+          {topLangs.length > 0 && (
             <p className="mt-3 text-[11px] text-[#6e7681] text-center">
-              最长连续贡献 {streak.days} 天（{streak.start} ~ {streak.end}）
+              常用开发语言 (Top {topLangs.length}):{' '}
+              {topLangs
+                .map((l) => `${l.language} ${l.percentage.toFixed(0)}%`)
+                .join(' · ')}
             </p>
           )}
         </>

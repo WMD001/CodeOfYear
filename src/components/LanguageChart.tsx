@@ -1,9 +1,10 @@
 /**
- * LanguageChart：编程语言分布（环形图）
+ * LanguageChart：编程语言分布（环形图，参照设计图"编程语言占比"面板）
  * - ECharts 环形图：Top5 语言 + 其他合并
  * - 中心展示统计仓库数
  * - 悬停查看语言名称、字节数与占比
  * - 右侧明细列表（Top5 + 其他）
+ * - 下方"语言字节数 (Top 3)"（设计图为"代码行数 Top 3"；语言字节数 ≠ 代码行数，如实标注口径）
  */
 import { useMemo, useRef } from 'react'
 import type { LanguageStat } from '../types/report'
@@ -17,6 +18,14 @@ interface Props {
     totalBytes: number
     isComplete: boolean
   }
+}
+
+/** 字节数可读化（KB/MB/GB） */
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
 }
 
 /** 语言 → 颜色映射（辅助色系，其余语言用哈希取色） */
@@ -169,7 +178,7 @@ export default function LanguageChart({ data }: Props) {
                     {s.percentage.toFixed(1)}%
                   </span>
                   <span className="mono-num text-xs text-[#6e7681] w-20 text-right">
-                    {(s.bytes / 1024).toFixed(1)} KB
+                    {formatBytes(s.bytes)}
                   </span>
                 </li>
               ))}
@@ -183,8 +192,33 @@ export default function LanguageChart({ data }: Props) {
                 </li>
               )}
             </ul>
-            <p className="mt-4 text-[11px] text-[#6e7681] leading-relaxed">
-              语言占比 = 该语言字节数 ÷ 全部语言字节数；同一代码存在于多个仓库时可能重复计算；不代表年度提交语言分布。
+
+            {/* 语言字节数 Top 3（设计图"代码行数 Top 3"的如实口径） */}
+            {top.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-[#21262d]">
+                <p className="text-xs text-[#8b949e] mb-2">
+                  语言字节数 (Top {Math.min(3, top.length)})
+                </p>
+                <ul className="flex flex-col gap-1.5">
+                  {top.slice(0, 3).map((s) => (
+                    <li
+                      key={`bytes-${s.language}`}
+                      className="flex items-baseline justify-between gap-2 text-xs"
+                    >
+                      <span className="text-[#8b949e] truncate">
+                        {s.language}
+                      </span>
+                      <span className="mono-num text-[#6e7681] shrink-0">
+                        {formatBytes(s.bytes)} · {s.percentage.toFixed(1)}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <p className="mt-3 text-[11px] text-[#6e7681] leading-relaxed">
+              语言占比 = 该语言字节数 ÷ 全部语言字节数；同一代码存在于多个仓库时可能重复计算；语言字节数 ≠ 代码行数或提交次数。
             </p>
           </div>
         </div>

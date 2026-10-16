@@ -41,6 +41,7 @@ function makeReport(): YearlyReport {
       endDate: '2026-10-16',
       generatedAt: '2026-10-16T00:00:00.000Z',
     },
+    dataMode: 'rest',
     user: {
       login: 'octocat',
       displayName: 'Octo Cat',
@@ -72,8 +73,26 @@ function makeReport(): YearlyReport {
       sortNote: '测试数据',
       sortedByCommits: true,
     },
-    languages: { stats: [], repoCount: 0, totalBytes: 0, isComplete: true },
-    monthlyTrend: [],
+    languages: {
+      stats: [
+        { language: 'TypeScript', bytes: 102400, percentage: 62.5 },
+        { language: 'Java', bytes: 40960, percentage: 25.0 },
+        { language: 'Python', bytes: 20480, percentage: 12.5 },
+      ],
+      repoCount: 3,
+      totalBytes: 163840,
+      isComplete: true,
+    },
+    monthlyTrend: Array.from({ length: 12 }, (_, i) => {
+      const month = i + 1
+      const isComplete = month <= 10 // 2026 年 10 月统计截止
+      return {
+        month,
+        monthLabel: `${month}月`,
+        commits: isComplete ? 12 : null,
+        isComplete,
+      }
+    }),
     activity: {
       longestStreak: complete({ days: 5, start: '2026-07-01', end: '2026-07-05' }),
       firstContribution: complete('2026-01-03'),
@@ -98,6 +117,14 @@ function makeReport(): YearlyReport {
       comments: complete(5),
       primaryLanguage: complete('TypeScript'),
       lastConfirmedContribution: complete('2026-10-01'),
+    },
+    lastYear: {
+      totalCommits: 100,
+      contributionDays: 25,
+      pullRequests: 5,
+      issues: 2,
+      reviews: 1,
+      newRepositories: 2,
     },
   }
 }
@@ -135,6 +162,17 @@ describe('ReportPage 报告页', () => {
     expect(screen.getByText('贡献天数')).toBeInTheDocument()
     // 数据模式提示（匿名）
     expect(screen.getByText(/匿名数据模式/)).toBeInTheDocument()
+    // 图1 布局区块
+    expect(screen.getByText('开发活跃度')).toBeInTheDocument()
+    expect(screen.getByText('年度其他数据')).toBeInTheDocument()
+    expect(screen.getAllByText('最长连续贡献').length).toBeGreaterThan(0)
+    expect(screen.getByText('本年首次提交')).toBeInTheDocument()
+    expect(screen.getByText(/代码不只是工作/)).toBeInTheDocument()
+    expect(screen.getByText('编程语言占比')).toBeInTheDocument()
+    expect(screen.getByText('提交趋势')).toBeInTheDocument()
+    expect(screen.getByText(/常用开发语言/)).toBeInTheDocument()
+    // 同比展示（lastYear 有数据时）
+    expect(screen.getAllByText(/vs 2025/).length).toBeGreaterThan(0)
   })
 
   it('加载失败显示错误与重试按钮', async () => {
@@ -148,6 +186,10 @@ describe('ReportPage 报告页', () => {
     })
     expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '返回首页' })).toBeInTheDocument()
+    // 错误态也可直接配置 Token（限流场景入口）
+    expect(
+      screen.getByRole('button', { name: '配置 Token（可选）' }),
+    ).toBeInTheDocument()
   })
 
   it('缺少用户名时提示返回首页', () => {

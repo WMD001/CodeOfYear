@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import TokenSetting from '../components/TokenSetting'
+import { hasGithubToken } from '../api/github-graphql'
 
 /** GitHub 用户名规则：字母/数字/连字符，不以连字符开头或结尾，长度 1-39 */
 const USERNAME_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/
@@ -13,6 +15,8 @@ function HomePage() {
   const [username, setUsername] = useState('')
   const [year, setYear] = useState(CURRENT_YEAR)
   const [error, setError] = useState<string | null>(null)
+  const [tokenOpen, setTokenOpen] = useState(false)
+  const tokenConfigured = hasGithubToken()
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -33,7 +37,15 @@ function HomePage() {
   for (let y = CURRENT_YEAR; y >= MIN_YEAR; y--) yearOptions.push(y)
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 bg-gradient-to-b from-[#0d1117] via-[#0d1117] to-[#10151c]">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 bg-gradient-to-b from-[#0d1117] via-[#0d1117] to-[#10151c] relative">
+      {/* 右上角 Token 配置入口 */}
+      <button
+        type="button"
+        onClick={() => setTokenOpen(true)}
+        className="absolute top-4 right-4 text-xs border border-[#30363d] hover:border-[#3d444d] text-[#8b949e] hover:text-[#e6edf3] rounded-lg px-3 py-1.5 transition"
+      >
+        {tokenConfigured ? '已配置 Token' : '配置 Token（可选）'}
+      </button>
       {/* GitHub 标识 */}
       <div className="mb-6">
         <svg
@@ -134,7 +146,22 @@ function HomePage() {
           数据来源：GitHub 公开 API（REST & GraphQL）· 所有统计基于实际获取的数据
           · 当前年份统计截止于今日，不展示未来贡献
         </p>
+        <button
+          type="button"
+          onClick={() => setTokenOpen(true)}
+          className="mt-4 text-xs text-[#8b949e] hover:text-[#e6edf3] underline underline-offset-4 transition"
+        >
+          {tokenConfigured
+            ? '已配置 Token（点击修改）'
+            : '配置 Token（可选，提升 API 请求额度）'}
+        </button>
       </div>
+
+      <TokenSetting
+        open={tokenOpen}
+        onClose={() => setTokenOpen(false)}
+        onSaved={() => setTokenOpen(false)}
+      />
     </div>
   )
 }

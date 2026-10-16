@@ -66,8 +66,9 @@ npm run preview    # 预览构建产物
 ```
 src/
 ├── api/               # GitHub REST / GraphQL 封装（请求、重试、分页、错误归一化）
-├── components/        # ReportHeader / MetricCards / ContributionHeatmap / RepositoryRanking /
-│                      # LanguageChart / CommitTrend / ActivityPanel / ExtraStats / TokenSetting / DataStatus
+├── components/        # ReportHeader / MetricCards / ContributionHeatmap / ContributionHighlights /
+│                      # OtherStatsPanel / RepositoryRanking / LanguageChart / CommitTrend /
+│                      # DevActivityPanel / TokenSetting / DataStatus
 ├── pages/             # HomePage / ReportPage
 ├── hooks/             # useReport（加载状态机）
 ├── services/          # report-service（编排与降级）/ statistics-service（统计口径）
