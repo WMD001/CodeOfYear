@@ -48,7 +48,7 @@ function Row({
 
 export default function OtherStatsPanel({ extra }: Props) {
   return (
-    <div className="card p-5">
+    <div className="card p-4 flex flex-col min-w-0">
       <h2 className="text-base font-semibold text-[#e6edf3] mb-2">
         年度其他数据
       </h2>
@@ -75,7 +75,7 @@ export default function OtherStatsPanel({ extra }: Props) {
         />
       </div>
 
-      <p className="mt-3 text-[11px] text-[#6e7681] leading-relaxed">
+      <p className="mt-auto pt-3 text-[11px] text-[#6e7681] leading-relaxed">
         年度指标与当前状态严格区分；公开 API 无法可靠还原的指标（如私有仓库数）不展示。
       </p>
     </div>

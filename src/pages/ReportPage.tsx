@@ -139,7 +139,7 @@ function ReportPage() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-6 max-w-[1400px] mx-auto">
+    <div className="min-h-screen px-4 py-6 md:px-8 max-w-[1920px] mx-auto">
       {/* 数据模式工具条 + 导出/分享 */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-[#8b949e]">
@@ -226,7 +226,7 @@ function ReportPage() {
         </section>
 
         {/* 第三行：全年贡献热力图 + 右侧两面板（连续贡献/首次提交/寄语 + 年度其他数据） */}
-        <section className="mt-6 grid grid-cols-1 lg:grid-cols-[1.8fr_1fr_1fr] gap-4">
+        <section className="mt-6 grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr] gap-4">
           <ContributionHeatmap
             days={report.heatmap.days}
             totalContributions={report.heatmap.totalContributions}

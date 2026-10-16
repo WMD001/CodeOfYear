@@ -25,9 +25,9 @@ export default function ContributionHighlights({
   const first = activity.firstContribution
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {/* 最长连续贡献 */}
-      <div className="card p-5">
+      <div className="card p-4">
         <p className="text-sm text-[#8b949e]">最长连续贡献</p>
         {streak.value ? (
           <>
@@ -49,7 +49,7 @@ export default function ContributionHighlights({
       </div>
 
       {/* 本年首次提交 */}
-      <div className="card p-5">
+      <div className="card p-4">
         <p className="text-sm text-[#8b949e]">本年首次提交</p>
         {first.value ? (
           <>
@@ -66,7 +66,7 @@ export default function ContributionHighlights({
       </div>
 
       {/* 寄语 */}
-      <div className="card p-5 flex flex-col justify-center">
+      <div className="card p-4 flex flex-col justify-center">
         <p className="text-[#8b949e] italic text-base leading-relaxed">
           “代码不只是工作，
           <br />

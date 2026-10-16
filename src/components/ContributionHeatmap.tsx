@@ -177,7 +177,7 @@ export default function ContributionHeatmap({
   const chartWidth = grid.totalWeeks * (CELL + CELL_GAP) + 46
 
   return (
-    <div className="card p-5">
+    <div className="card p-5 flex flex-col min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h2 className="text-lg font-semibold text-[#e6edf3]">全年贡献热力图</h2>
         <div className="flex items-center gap-3 text-xs text-[#8b949e]">
@@ -189,7 +189,7 @@ export default function ContributionHeatmap({
       </div>
 
       {days.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-[#8b949e]">
+        <div className="flex flex-col items-center justify-center flex-1 min-h-[200px] text-[#8b949e]">
           <p>暂无贡献数据</p>
           <p className="mt-1 text-xs text-[#6e7681]">
             所选年度内未获取到可验证的贡献日历数据
@@ -197,15 +197,16 @@ export default function ContributionHeatmap({
         </div>
       ) : (
         <>
-          <div className="w-full overflow-x-auto pb-1">
+          {/* 图表区域：高度自适应填满卡片，消除下方空白（图1 大热力图观感） */}
+          <div className="w-full overflow-x-auto pb-1 flex-1 min-h-[220px] flex flex-col">
             <div
               ref={containerRef}
-              style={{ width: chartWidth, height: 148 }}
-              className="shrink-0"
+              style={{ width: chartWidth }}
+              className="flex-1 shrink-0 min-h-[220px]"
             />
           </div>
           {/* 颜色图例：贡献少 → 贡献多 */}
-          <div className="mt-2 flex items-center justify-end gap-1 text-[10px] text-[#6e7681]">
+          <div className="mt-3 flex items-center justify-end gap-1 text-[10px] text-[#6e7681]">
             <span>贡献少</span>
             {pieces.map((p) => (
               <span
