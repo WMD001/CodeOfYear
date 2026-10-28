@@ -84,7 +84,13 @@ export async function getContributionsCollection(
     },
     body: JSON.stringify({
       query: CALENDAR_QUERY,
-      variables: { login: username, from, to },
+      // GitHub GraphQL 的 from/to 类型为 DateTime!，必须传完整 ISO 8601 时间戳；
+      // 传 "YYYY-MM-DD" 会报 "Variable $from of type DateTime! was provided invalid value"。
+      variables: {
+        login: username,
+        from: `${from}T00:00:00Z`,
+        to: `${to}T23:59:59Z`,
+      },
     }),
     signal: AbortSignal.timeout(30_000),
   })

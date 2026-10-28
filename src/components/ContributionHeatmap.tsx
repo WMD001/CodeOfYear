@@ -19,8 +19,10 @@ interface Props {
 }
 
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-const CELL = 13
+const CELL = 14
 const CELL_GAP = 3
+/** 图表容器固定高度：7 行格子（17px 行距）+ 月份标签，保持 GitHub 正方形格子比例，禁止 flex 拉伸 */
+const CHART_HEIGHT = 168
 
 /** 星期序号（周一=0） */
 function weekdayIndex(dateStr: string): number {
@@ -189,7 +191,7 @@ export default function ContributionHeatmap({
       </div>
 
       {days.length === 0 ? (
-        <div className="flex flex-col items-center justify-center flex-1 min-h-[200px] text-[#8b949e]">
+        <div className="flex flex-1 flex-col items-center justify-center min-h-[200px] text-[#8b949e]">
           <p>暂无贡献数据</p>
           <p className="mt-1 text-xs text-[#6e7681]">
             所选年度内未获取到可验证的贡献日历数据
@@ -197,12 +199,12 @@ export default function ContributionHeatmap({
         </div>
       ) : (
         <>
-          {/* 图表区域：高度自适应填满卡片，消除下方空白（图1 大热力图观感） */}
-          <div className="w-full overflow-x-auto pb-1 flex-1 min-h-[220px] flex flex-col">
+          {/* 图表区：固定高度保持格子比例；外层 flex-1 让图表在卡片剩余空间垂直居中（与右侧面板等高时不留难看空白） */}
+          <div className="w-full flex-1 overflow-x-auto pb-1 flex flex-col items-center justify-center">
             <div
               ref={containerRef}
-              style={{ width: chartWidth }}
-              className="flex-1 shrink-0 min-h-[220px]"
+              style={{ width: chartWidth, height: CHART_HEIGHT }}
+              className="shrink-0"
             />
           </div>
           {/* 颜色图例：贡献少 → 贡献多 */}

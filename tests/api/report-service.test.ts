@@ -78,8 +78,8 @@ describe('report-service 报告组装', () => {
     expect(report.header.username).toBe('octocat')
     expect(report.header.year).toBe(2026)
     expect(report.header.startDate).toBe('2026-01-01')
-    // 当前年份截止今日（2026-10-16）
-    expect(report.header.endDate).toBe('2026-10-16')
+    // 当前年份截止今日（动态取当天，避免硬编码日期随时间过期）
+    expect(report.header.endDate).toBe(new Date().toISOString().slice(0, 10))
 
     // 用户资料
     expect(report.user.publicRepos).toBe(3)
