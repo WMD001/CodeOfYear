@@ -41,6 +41,7 @@ import type {
   LastYearSnapshot,
   MetricCards,
   ReportHeader,
+  ReportStage,
   YearlyReport,
 } from '../types/report'
 import {
@@ -174,10 +175,13 @@ async function loadLastYearStats(
 export async function loadYearlyReport(
   username: string,
   year: number,
+  onStage?: (stage: ReportStage) => void,
 ): Promise<YearlyReport> {
   if (!isValidYear(year)) {
     throw new GithubApiError('validation', `统计年份无效：${year}`, null)
   }
+
+  onStage?.('profile')
 
   const startDate = yearStartDate(year)
   const endDate = yearEndDate(year)
@@ -200,6 +204,7 @@ export async function loadYearlyReport(
   }
 
   /* ---------- 2. 仓库列表 ---------- */
+  onStage?.('repos')
   let repos: GithubRepository[] = []
   try {
     repos = await getUserRepositories(username)
@@ -210,6 +215,7 @@ export async function loadYearlyReport(
   const nonForkRepos = repos.filter((r) => !r.fork)
 
   /* ---------- 3. GraphQL 贡献日历（已登录时优先，精确口径） ---------- */
+  onStage?.('contributions')
   let calendarDays: HeatmapDay[] = []
   let calendarTotal = 0
   let useGraphql = false
@@ -303,6 +309,7 @@ export async function loadYearlyReport(
   }
 
   // 上一年度同口径数据（best-effort，同比展示用）
+  onStage?.('languages')
   const lastYear = await loadLastYearStats(username, year, useGraphql, nonForkRepos)
 
   function countForDate(date: string): number {
@@ -343,6 +350,7 @@ export async function loadYearlyReport(
     : { stats: [] as typeof languageAgg.stats, repoCount: 0, totalBytes: 0, isComplete: false }
 
   /* ---------- 5. 年度 PR / Issue / Review / 评论（Search API） ---------- */
+  onStage?.('search')
   // Search API 匿名限流仅 10 次/分钟，失败时保留其余数据并把对应指标标为 error
   const [prResult, issueResult, reviewResult, commentResult] = await Promise.all([
     settle(searchPullRequestStats(username, startDate, endDate)),
@@ -612,5 +620,6 @@ export async function loadYearlyReport(
     extra,
   }
 
+  onStage?.('done')
   return report
 }

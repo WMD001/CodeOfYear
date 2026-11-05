@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { loadYearlyReport } from '../services/report-service'
 import { GithubApiError } from '../api/github-errors'
-import type { YearlyReport } from '../types/report'
+import type { ReportStage, YearlyReport } from '../types/report'
 
 export type ReportLoadState =
   | { phase: 'loading' }
@@ -14,6 +14,7 @@ export type ReportLoadState =
 
 export function useReport(username: string, year: number) {
   const [state, setState] = useState<ReportLoadState>({ phase: 'loading' })
+  const [stage, setStage] = useState<ReportStage>('profile')
   const [reloadKey, setReloadKey] = useState(0)
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), [])
@@ -21,8 +22,11 @@ export function useReport(username: string, year: number) {
   useEffect(() => {
     let cancelled = false
     setState({ phase: 'loading' })
+    setStage('profile')
 
-    loadYearlyReport(username, year)
+    loadYearlyReport(username, year, (nextStage) => {
+      if (!cancelled) setStage(nextStage)
+    })
       .then((report) => {
         if (!cancelled) setState({ phase: 'success', report })
       })
@@ -41,5 +45,5 @@ export function useReport(username: string, year: number) {
     }
   }, [username, year, reloadKey])
 
-  return { state, reload }
+  return { state, reload, stage }
 }

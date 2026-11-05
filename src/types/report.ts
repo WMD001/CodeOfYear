@@ -137,6 +137,15 @@ export interface LastYearSnapshot {
   newRepositories?: number
 }
 
+/** 报告加载阶段（用于加载动画，按实际请求顺序推进） */
+export type ReportStage =
+  | 'profile'
+  | 'repos'
+  | 'contributions'
+  | 'languages'
+  | 'search'
+  | 'done'
+
 /** 完整年度报告 */
 export interface YearlyReport {
   header: ReportHeader

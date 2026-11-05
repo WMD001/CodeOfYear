@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GitHub Yearly Wrapped · 视觉 Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #080d14;
+    --card: #131a26;
+    --card-2: #0d141d;
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: rgba(255, 255, 255, 0.12);
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --dim: #6e7681;
+    --green: #3fb950;
+    --green-2: #2ea043;
+    --green-dark: #238636;
+    --blue: #58a6ff;
+    --yellow: #e3b341;
+    --purple: #a371f7;
+    --pink: #f778ba;
+    --red: #f85149;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --cn: "LXGW WenKai", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--cn);
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(900px 460px at 10% -10%, rgba(46, 160, 67, 0.13), transparent 60%),
+      radial-gradient(900px 480px at 92% -12%, rgba(88, 166, 255, 0.1), transparent 58%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+  button { font: inherit; cursor: pointer; }
+  a { color: inherit; }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 24px 20px 56px;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand-mark {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: grid; place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #f0f4f8;
+    flex: 0 0 auto;
+  }
+  .brand-text { font-family: var(--mono); font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+  .brand-text span { color: var(--green); }
+  .top-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .year-pill {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 9px;
+  }
+
+  /* ---------- 按钮 ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: 34px; padding: 0 14px;
+    border-radius: 9px; border: 1px solid transparent;
+    font-size: 12px; font-weight: 600; line-height: 1;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, color 0.15s ease;
+    text-decoration: none;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--green-dark); color: #fff; }
+  .btn-primary:hover { background: var(--green-2); }
+  .btn-ghost {
+    background: transparent; border-color: var(--line-strong); color: #b7c2d0;
+  }
+  .btn-ghost:hover { border-color: rgba(255, 255, 255, 0.24); color: var(--text); }
+  .btn-sm { height: 30px; padding: 0 11px; font-size: 11px; border-radius: 8px; }
+  .btn-arrow { color: var(--green); font-family: var(--mono); }
+
+  /* ---------- Wrapped 摘要 ---------- */
+  .wrapped { display: block; }
+  .hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(19, 26, 38, 0.98), rgba(10, 16, 24, 0.98));
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.46);
+    padding: 30px 32px 24px;
+  }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(700px 340px at 8% -12%, rgba(63, 185, 80, 0.17), transparent 60%),
+      radial-gradient(620px 320px at 96% -16%, rgba(88, 166, 255, 0.13), transparent 60%),
+      radial-gradient(420px 260px at 55% 130%, rgba(163, 113, 247, 0.07), transparent 60%);
+  }
+  .hero > * { position: relative; z-index: 1; }
+
+  .hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .identity { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .avatar {
+    width: 54px; height: 54px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 700; font-size: 17px; color: #fff;
+    background: linear-gradient(135deg, #1f6feb, #8957e5);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06), 0 8px 24px rgba(31, 111, 235, 0.28);
+    flex: 0 0 auto;
+  }
+  .name { font-size: 19px; font-weight: 600; letter-spacing: 0.01em; }
+  .handle { margin-left: 7px; font-family: var(--mono); font-size: 12px; color: var(--blue); font-weight: 400; }
+  .sub { margin-top: 5px; font-size: 12px; color: var(--muted); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid rgba(63, 185, 80, 0.3);
+    background: rgba(63, 185, 80, 0.08);
+    color: var(--green); border-radius: 999px;
+    padding: 5px 10px; font-size: 11px; white-space: nowrap;
+  }
+  .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .hero-main {
+    display: grid;
+    grid-template-columns: 0.86fr 1.14fr;
+    gap: 34px;
+    align-items: end;
+    margin-top: 26px;
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .big-number {
+    margin: 8px 0 9px;
+    font-family: var(--mono);
+    font-size: clamp(56px, 8vw, 88px);
+    line-height: 0.94;
+    font-weight: 700;
+    letter-spacing: -0.06em;
+    background: linear-gradient(180deg, #ffffff 20%, #b8c6d8 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+  }
+  .delta { display: flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-size: 12px; color: var(--green); }
+  .delta span { font-family: var(--cn); color: var(--muted); }
+
+  .heatmap-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+  .heatmap-head b { font-size: 12px; font-weight: 600; color: #c7d1dd; }
+  .heatmap-head span { font-family: var(--mono); font-size: 10px; color: var(--dim); }
+  .heatmap {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, auto);
+    grid-auto-columns: 1fr;
+    gap: 2.5px;
+    width: 100%;
+  }
+  .heatmap i { display: block; width: 100%; aspect-ratio: 1; border-radius: 2px; background: #182029; }
+  .heatmap i[data-l="1"] { background: #0e4429; }
+  .heatmap i[data-l="2"] { background: #006d32; }
+  .heatmap i[data-l="3"] { background: #26a641; }
+  .heatmap i[data-l="4"] { background: #39d353; }
+  .heat-legend {
+    display: flex; align-items: center; justify-content: flex-end; gap: 4px;
+    margin-top: 8px; font-size: 9.5px; color: var(--dim); font-family: var(--mono);
+  }
+  .heat-legend i { width: 9px; height: 9px; border-radius: 2px; display: block; }
+
+  .mini-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 24px; }
+  .mini {
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.045);
+    border-radius: 12px;
+    padding: 11px 13px;
+    min-width: 0;
+  }
+  .mini .k { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .mini .v { margin-top: 6px; font-family: var(--mono); font-size: 20px; font-weight: 700; line-height: 1; }
+  .mini .d { margin-top: 5px; font-size: 9.5px; color: var(--green); font-family: var(--mono); }
+  .mini .d.muted { color: var(--dim); font-family: var(--cn); }
+
+  .keywords { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.075);
+    background: rgba(255, 255, 255, 0.028);
+    color: #b7c2d0; border-radius: 999px; padding: 5px 10px; font-size: 11px;
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+  .chip.green { border-color: rgba(63, 185, 80, 0.25); background: rgba(63, 185, 80, 0.07); color: var(--green); }
+  .chip.blue { border-color: rgba(88, 166, 255, 0.24); background: rgba(88, 166, 255, 0.07); color: var(--blue); }
+  .chip.yellow { border-color: rgba(227, 179, 65, 0.24); background: rgba(227, 179, 65, 0.07); color: var(--yellow); }
+  .chip.purple { border-color: rgba(163, 113, 247, 0.24); background: rgba(163, 113, 247, 0.07); color: var(--purple); }
+
+  .hero-footer {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-top: 22px; padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .hint { margin-left: auto; font-size: 10px; color: #5f6b7a; }
+
+  .below-grid { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 14px; margin-top: 14px; }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    min-width: 0;
+  }
+  .panel .label { font-size: 11px; color: var(--muted); }
+  .panel h3 { margin: 8px 0 4px; font-size: 18px; font-weight: 600; line-height: 1.25; }
+  .panel p { margin: 0; font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .panel .mono { font-family: var(--mono); }
+  .persona h3 { color: var(--green); }
+  .lang-bar { margin-top: 10px; height: 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+  .lang-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2ea043, #3fb950); }
+
+  /* ---------- 单屏总览 ---------- */
+  .overview-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 18px; margin-bottom: 16px;
+  }
+  .overview-name {
+    margin: 0; font-family: var(--mono); font-size: 40px;
+    font-weight: 700; letter-spacing: -0.045em; line-height: 1;
+  }
+  .overview-sub {
+    margin-top: 9px; display: flex; align-items: center; gap: 7px;
+    font-size: 11px; color: var(--muted);
+  }
+  .mode-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); display: inline-block;
+    box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.1);
+  }
+  .overview-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .overview-grid {
+    display: grid;
+    grid-template-columns: 1.55fr 1fr 1fr;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .overview-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .overview-col-main > .overview-card { flex: 0 0 auto; }
+  .overview-col-main > .repos-card { flex: 1; }
+  .overview-col > .languages-card { flex: 1; }
+  .overview-col > .stars-card { flex: 0 0 auto; }
+  .overview-col > .people-card { flex: 0 0 auto; }
+  .overview-col > .keywords-card { flex: 1; }
+  .overview-card, .repos-card { display: flex; flex-direction: column; }
+
+  .overview-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 22px;
+    margin-top: 18px;
+  }
+  .overview-stat b {
+    display: block; font-family: var(--mono); font-size: 32px;
+    font-weight: 700; line-height: 1; letter-spacing: -0.035em;
+  }
+  .overview-stat span { display: block; margin-top: 7px; font-size: 10.5px; color: var(--muted); }
+
+  .repo-bars { display: flex; flex-direction: column; gap: 13px; margin-top: 16px; }
+  .repo-bar-head {
+    display: flex; justify-content: space-between; gap: 10px;
+    margin-bottom: 6px; font-size: 10.5px; color: #c7d1dd;
+  }
+  .repo-bar-head .mono { font-family: var(--mono); font-size: 9.5px; color: var(--muted); }
+  .repo-bar { height: 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+  .repo-bar span { display: block; height: 100%; border-radius: inherit; }
+  .repo-links { display: flex; gap: 14px; flex-wrap: wrap; margin-top: auto; padding-top: 14px; }
+  .repo-links a {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10.5px; color: var(--blue); text-decoration: none;
+  }
+  .repo-links a span { font-family: var(--mono); font-size: 9.5px; color: var(--yellow); }
+  .repo-links a:hover { text-decoration: underline; }
+
+  .lang-list { list-style: none; margin: 15px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .lang-list li { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .lang-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .lang-name { flex: 1; color: #c7d1dd; }
+  .lang-pct { font-family: var(--mono); font-size: 9.5px; color: var(--muted); }
+
+  .star-stat, .people-stat { display: flex; align-items: baseline; gap: 8px; margin-top: 15px; }
+  .star-stat b, .people-stat b { font-family: var(--mono); font-size: 27px; font-weight: 700; line-height: 1; }
+  .star-stat span, .people-stat span { font-size: 10.5px; color: var(--muted); }
+  .people-stat b { color: #dbe4ee; }
+
+  .kw-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 7px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+    font-size: 10.5px; color: var(--muted);
+  }
+  .kw-row:last-child { border-bottom: 0; }
+  .kw-row b { font-family: var(--mono); font-size: 10.5px; font-weight: 600; color: #dbe4ee; }
+
+  .heatmap-overview { margin-top: 12px; }
+  .heatmap-months {
+    display: grid; grid-template-columns: repeat(12, 1fr);
+    margin: 10px 0 5px;
+    font-family: var(--mono); font-size: 8.5px; color: var(--dim);
+  }
+  .heatmap-months span { text-align: left; }
+  .heatmap-overview .heatmap { gap: 3px; margin-top: 4px; }
+  .overview-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-top: 12px;
+    font-size: 10px; color: #5f6b7a; flex-wrap: wrap;
+  }
+
+  /* ---------- 完整仪表盘 ---------- */
+  .full { display: none; }
+  body[data-view="wrapped"] .wrapped { display: block; }
+  body[data-view="full"] .wrapped { display: none; }
+  body[data-view="full"] .full { display: block; }
+
+  .full-header {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 18px;
+    padding-bottom: 15px; border-bottom: 1px solid var(--line);
+    margin-bottom: 16px;
+  }
+  .full-title {
+    font-size: 28px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em;
+  }
+  .full-title span { color: var(--green); }
+  .full-sub { margin-top: 7px; font-size: 12px; color: var(--muted); }
+  .full-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .metric-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; }
+  .metric {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 13px 13px 11px;
+    min-width: 0;
+  }
+  .metric-head { display: flex; align-items: center; gap: 8px; }
+  .metric-icon {
+    width: 30px; height: 30px; border-radius: 9px;
+    display: grid; place-items: center;
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    flex: 0 0 auto;
+  }
+  .metric-label { font-size: 11px; color: #aab6c4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .metric-value {
+    margin-top: 10px; padding-left: 38px;
+    font-family: var(--mono); font-size: 26px; font-weight: 700; line-height: 1;
+  }
+  .metric-foot {
+    margin-top: 8px; padding-left: 38px; min-height: 24px;
+    font-size: 9.5px; line-height: 1.35;
+  }
+  .metric-foot .up { color: var(--green); }
+  .metric-foot .flat { color: var(--dim); }
+
+  .mid-grid { display: grid; grid-template-columns: 2.5fr 1fr 1.25fr; gap: 12px; margin-top: 12px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    min-width: 0;
+  }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .card-title { margin: 0; font-size: 14px; font-weight: 600; }
+  .card-title .ico { margin-right: 6px; }
+  .card-note { font-family: var(--mono); font-size: 10px; color: var(--dim); }
+
+  .heatmap-full { margin-top: 14px; }
+  .heatmap-full .heatmap { gap: 3px; }
+  .heatmap-full .heatmap i { border-radius: 2.5px; }
+
+  .streak-card { display: flex; flex-direction: column; gap: 11px; }
+  .streak-row {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.045);
+    border-radius: 10px; padding: 9px 10px;
+  }
+  .streak-ico {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: grid; place-items: center; flex: 0 0 auto;
+    background: rgba(63, 185, 80, 0.1); color: var(--green); font-size: 14px;
+  }
+  .streak-row .k { font-size: 10px; color: var(--muted); }
+  .streak-row .v { margin-top: 2px; font-family: var(--mono); font-size: 15px; font-weight: 600; }
+  .quote {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    border-left: 2px solid rgba(46, 160, 67, 0.45);
+    background: var(--card-2); border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .quote p { margin: 0; font-size: 10.5px; font-style: italic; color: #9aa7b6; line-height: 1.7; }
+  .quote span { margin-top: 5px; font-size: 9.5px; color: var(--dim); }
+
+  .stat-list { display: flex; flex-direction: column; margin-top: 10px; }
+  .stat-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 11px;
+  }
+  .stat-row:last-child { border-bottom: 0; }
+  .stat-row .left { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .stat-row .v { font-family: var(--mono); color: #dbe4ee; text-align: right; }
+  .stat-note { margin-top: auto; padding-top: 10px; font-size: 9.5px; line-height: 1.6; color: #7d899a; }
+
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1.05fr 1.1fr 0.9fr;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .repo-table { width: 100%; border-collapse: collapse; margin-top: 9px; }
+  .repo-table th {
+    text-align: left; font-weight: 400; font-size: 9.5px; color: var(--dim);
+    padding: 5px 6px 5px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    white-space: nowrap;
+  }
+  .repo-table th.num, .repo-table td.num { text-align: right; }
+  .repo-table td {
+    padding: 7px 6px 7px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+    font-size: 10.5px; white-space: nowrap;
+  }
+  .repo-table tr:last-child td { border-bottom: 0; }
+  .rank {
+    display: inline-grid; place-items: center;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #1a2332; border: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: var(--mono); font-size: 9px; color: #9aa7b6;
+  }
+  .repo-name { display: block; color: #dbe4ee; font-weight: 500; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+  .repo-desc { display: block; margin-top: 2px; font-size: 9px; color: var(--dim); max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+  .lang-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 999px; padding: 1px 6px; font-size: 9px; color: #b7c2d0;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+  .donut-wrap { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+  .donut {
+    position: relative; width: 138px; height: 138px; border-radius: 50%; flex: 0 0 auto;
+  }
+  .donut::after {
+    content: ""; position: absolute; inset: 24px; border-radius: 50%;
+    background: var(--card);
+  }
+  .donut-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; z-index: 1; pointer-events: none;
+  }
+  .donut-center b { font-family: var(--mono); font-size: 19px; line-height: 1; }
+  .donut-center span { margin-top: 4px; font-size: 9px; color: var(--muted); }
+  .legend { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1; }
+  .legend-row { display: flex; align-items: center; gap: 5px; font-size: 9.5px; color: var(--muted); }
+  .legend-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend-row .pct { font-family: var(--mono); color: #9aa7b6; }
+
+  .chart {
+    display: flex; align-items: flex-end; gap: 7px;
+    height: 128px; margin-top: 13px;
+    padding-top: 6px;
+  }
+  .chart .bar {
+    flex: 1; min-width: 0;
+    border-radius: 3px 3px 0 0;
+    background: linear-gradient(180deg, #3fb950, #0e4429);
+    opacity: 0.9;
+    transition: opacity 0.15s ease;
+  }
+  .chart .bar:hover { opacity: 1; }
+  .chart-x { display: flex; gap: 7px; margin-top: 5px; }
+  .chart-x span { flex: 1; text-align: center; font-family: var(--mono); font-size: 8.5px; color: var(--dim); }
+  .trend-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 11px; }
+  .trend-mini {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card-2); border: 1px solid rgba(255, 255, 255, 0.045);
+    border-radius: 9px; padding: 7px 9px;
+  }
+  .trend-mini .ico {
+    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(88, 166, 255, 0.1); color: var(--blue); font-size: 11px;
+  }
+  .trend-mini .k { font-size: 9px; color: var(--muted); }
+  .trend-mini .v { margin-top: 2px; font-family: var(--mono); font-size: 12px; font-weight: 600; }
+
+  .activity-list { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+  .activity-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 10.5px; }
+  .activity-row .k { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+  .activity-row .v { font-family: var(--mono); color: #dbe4ee; text-align: right; }
+  .progress { height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); overflow: hidden; margin-top: 5px; }
+  .progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2ea043, #3fb950); }
+  .activity-foot { margin-top: auto; padding-top: 9px; font-size: 9.5px; color: #7d899a; line-height: 1.6; }
+
+  /* ---------- 页脚 / toast ---------- */
+  .footer {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin-top: 28px; padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 10px; color: #5f6b7a;
+    flex-wrap: wrap;
+  }
+  .footer .mono { font-family: var(--mono); }
+  #toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 16px);
+    opacity: 0; pointer-events: none;
+    background: #1a2332; border: 1px solid var(--line-strong);
+    color: #dbe4ee; border-radius: 10px; padding: 9px 14px;
+    font-size: 11px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 100;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width: 1060px) {
+    .metric-grid { grid-template-columns: repeat(4, 1fr); }
+    .mid-grid { grid-template-columns: 1.8fr 1fr; }
+    .mid-grid .other-card { grid-column: 1 / -1; }
+    .bottom-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 860px) {
+    .overview-head { flex-direction: column; align-items: flex-start; }
+    .overview-actions { justify-content: flex-start; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .hero-main { grid-template-columns: 1fr; gap: 22px; align-items: start; }
+    .mini-metrics { grid-template-columns: repeat(2, 1fr); }
+    .below-grid { grid-template-columns: 1fr; }
+    .full-header { align-items: flex-start; flex-direction: column; }
+    .full-actions { justify-content: flex-start; }
+    .mid-grid { grid-template-columns: 1fr; }
+    .mid-grid .other-card { grid-column: auto; }
+  }
+  @media (max-width: 640px) {
+    .page { padding: 16px 12px 40px; }
+    .overview-name { font-size: 34px; }
+    .heatmap-overview { overflow-x: auto; }
+    .heatmap-overview .heatmap { min-width: 640px; }
+    .heatmap-months { min-width: 640px; }
+    .hero { padding: 22px 18px 18px; border-radius: 16px; }
+    .topbar { align-items: flex-start; }
+    .brand-text { display: none; }
+    .hero-top { flex-direction: column; gap: 10px; }
+    .big-number { font-size: 58px; }
+    .metric-grid { grid-template-columns: repeat(2, 1fr); }
+    .bottom-grid { grid-template-columns: 1fr; }
+    .hint { width: 100%; margin-left: 0; }
+    .full-title { font-size: 22px; }
+  }
+</style>
+</head>
+<body data-view="wrapped">
+
+<div class="page">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor">
+          <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.04-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.27-.82 2.15 0 3.07 1.87 3.75 3.65 3.95-.29.25-.55.73-.64 1.37-.57.26-2 .69-2.88-.82-.52-.88-1.44-.99-1.44-.99-.58.01-1.18.44-.46.86.82.38 1.26 1.5 1.26 1.5.73 2.06 3.71 1.39 3.71 1.39.01 1.23.01 2.02.01 2.33 0 .21-.15.46-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/>
+        </svg>
+      </span>
+      <span class="brand-text">GitHub Yearly <span>/ Wrapped</span></span>
+    </div>
+    <div class="top-actions">
+      <span class="year-pill">2025</span>
+
+    </div>
+  </header>
+
+  <!-- ==================== 单屏总览 ==================== -->
+  <main class="wrapped" aria-label="年度总览">
+    <div class="overview-head">
+      <div>
+        <h1 class="overview-name">WMD001</h1>
+        <div class="overview-sub">
+          2025 · GitHub 年度贡献总览
+          <span class="mode-dot" aria-hidden="true"></span>
+          完整数据模式
+        </div>
+      </div>
+      <div class="overview-actions">
+        <button class="btn btn-ghost btn-sm" type="button" onclick="copyLink()">复制链接</button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="exportCard()">导出分享卡</button>
+        <button class="btn btn-primary btn-sm" type="button" onclick="showFull()">查看完整仪表盘 <span class="btn-arrow" style="color:#fff">→</span></button>
+      </div>
+    </div>
+
+    <div class="overview-grid">
+      <div class="overview-col overview-col-main">
+        <section class="card overview-card">
+          <div class="card-head">
+            <h2 class="card-title">总览</h2>
+            <span class="card-note">2025</span>
+          </div>
+          <div class="overview-stats">
+            <div class="overview-stat"><b style="color:#58a6ff">134</b><span>总提交</span></div>
+            <div class="overview-stat"><b style="color:#e3b341">157</b><span>总贡献</span></div>
+            <div class="overview-stat"><b style="color:#3fb950">16</b><span>公开仓库</span></div>
+            <div class="overview-stat"><b style="color:#a371f7">2</b><span>Pull Requests</span></div>
+          </div>
+        </section>
+
+        <section class="card repos-card">
+          <div class="card-head">
+            <h2 class="card-title">仓库</h2>
+            <span class="card-note">年度提交分布</span>
+          </div>
+          <div class="repo-bars">
+            <div class="repo-bar-row">
+              <div class="repo-bar-head"><span>wx_msg_notify</span><span class="mono">21 次提交</span></div>
+              <div class="repo-bar"><span style="width:66%;background:linear-gradient(90deg,#d29922,#e3b341)"></span></div>
+            </div>
+            <div class="repo-bar-row">
+              <div class="repo-bar-head"><span>design-pattern-4j</span><span class="mono">11 次提交</span></div>
+              <div class="repo-bar"><span style="width:34%;background:linear-gradient(90deg,#2ea043,#3fb950)"></span></div>
+            </div>
+          </div>
+          <div class="repo-links">
+            <a href="#" onclick="return false;">wx_msg_notify <span>★ 6</span></a>
+            <a href="#" onclick="return false;">design-pattern-4j</a>
+          </div>
+        </section>
+      </div>
+
+      <div class="overview-col">
+        <section class="card languages-card">
+          <div class="card-head"><h2 class="card-title">编程语言</h2></div>
+          <ul class="lang-list">
+            <li><span class="lang-dot" style="background:#a371f7"></span><span class="lang-name">CSS</span><span class="lang-pct">32.4%</span></li>
+            <li><span class="lang-dot" style="background:#3572a5"></span><span class="lang-name">Python</span><span class="lang-pct">24.8%</span></li>
+            <li><span class="lang-dot" style="background:#00add8"></span><span class="lang-name">Go</span><span class="lang-pct">18.6%</span></li>
+            <li><span class="lang-dot" style="background:#b07219"></span><span class="lang-name">Java</span><span class="lang-pct">14.1%</span></li>
+            <li><span class="lang-dot" style="background:#3178c6"></span><span class="lang-name">TypeScript</span><span class="lang-pct">10.1%</span></li>
+          </ul>
+        </section>
+
+        <section class="card stars-card">
+          <div class="card-head"><h2 class="card-title">Star</h2></div>
+          <div class="star-stat"><b style="color:#3fb950">+121</b><span>标星的项目</span></div>
+          <div class="star-stat"><b style="color:#e3b341">+7</b><span>获得的 Star</span></div>
+        </section>
+      </div>
+
+      <div class="overview-col">
+        <section class="card people-card">
+          <div class="card-head"><h2 class="card-title">社交</h2></div>
+          <div class="people-stat"><b>0</b><span>关注</span></div>
+          <div class="people-stat"><b>1</b><span>粉丝</span></div>
+        </section>
+
+        <section class="card keywords-card">
+          <div class="card-head"><h2 class="card-title">年度关键词</h2></div>
+          <div class="kw-row"><span>🔥 最长连续</span><b>38 天</b></div>
+          <div class="kw-row"><span>☕ 主力语言</span><b>Java</b></div>
+          <div class="kw-row"><span>📈 最忙月份</span><b>7 月</b></div>
+          <div class="kw-row"><span>🗓 最活跃</span><b>周三</b></div>
+        </section>
+      </div>
+    </div>
+
+    <section class="card heatmap-overview">
+      <div class="heatmap-head">
+        <b>贡献热力图</b>
+        <span>2025 年 · 全年</span>
+      </div>
+      <div class="heatmap-months" aria-hidden="true">
+        <span>1月</span><span>2月</span><span>3月</span><span>4月</span><span>5月</span><span>6月</span>
+        <span>7月</span><span>8月</span><span>9月</span><span>10月</span><span>11月</span><span>12月</span>
+      </div>
+      <div class="heatmap" id="miniHeatmap" aria-label="全年贡献热力图示意"></div>
+      <div class="heat-legend">
+        <span>少</span>
+        <i style="background:#182029"></i>
+        <i style="background:#0e4429"></i>
+        <i style="background:#006d32"></i>
+        <i style="background:#26a641"></i>
+        <i style="background:#39d353"></i>
+        <span>多</span>
+      </div>
+    </section>
+
+    <div class="overview-footer">
+      <span>演示数据，仅用于视觉预览</span>
+      <button class="btn btn-primary btn-sm" type="button" onclick="showFull()">查看完整仪表盘 <span class="btn-arrow" style="color:#fff">→</span></button>
+    </div>
+  </main>
+
+  <!-- ==================== 完整仪表盘 ==================== -->
+  <main class="full" aria-label="完整仪表盘">
+    <div class="full-header">
+      <div>
+        <div class="full-title">GitHub <span>2025</span> 年度开发者贡献报告</div>
+        <div class="full-sub">代码记录成长 · 贡献见证坚持</div>
+      </div>
+      <div class="full-actions">
+        <button class="btn btn-ghost btn-sm" type="button" onclick="showWrapped()">← 返回摘要</button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="copyLink()">复制链接</button>
+        <button class="btn btn-primary btn-sm" type="button" onclick="exportCard()">导出 PNG</button>
+      </div>
+    </div>
+
+    <section class="metric-grid" aria-label="核心指标">
+      <div class="metric">
+        <div class="metric-head">
+          <span class="metric-icon" style="color:#3fb950;background:rgba(63,185,80,.12)">&lt;/&gt;</span>
+          <span class="metric-label">总提交次数</span>
+        </div>
+        <div class="metric-value">986</div>
+        <div class="metric-foot"><span class="up">↑ 29%</span> <span style="color:#6e7681">vs 2024 (764)</span></div>
+      </div>
+      <div class="metric">
+        <div class="metric-head">
+          <span class="metric-icon" style="color:#58a6ff;background:rgba(88,166,255,.12)">▤</span>
+          <span class="metric-label">年度仓库数</span>
+        </div>
+        <div class="metric-value">28</div>
+        <div class="metric-foot"><span class="flat">vs 2024 (22)</span></div>
+      </div>
+      <div class="metric">
+        <div class="metric-head">
+          <span class="metric-icon" style="color:#e3b341;background:rgba(227,179,65,.12)">★</span>
+          <span class="metric-label">当前 Star 总数</span>
+        </div>
+        <div class="metric-value">156</div>
+        <div class="metric-foot"><span class="flat">年度增量不可还原</span></div>
+      </div>
+      <div class="metric">
+        <div class="metric-head">
+          <span class="metric-icon" style="color:#a371f7;background:rgba(163,113,247,.12)">⑂</span>
+          <span class="metric-label">当前 Fork 总数</span>
+        </div>
+        <div class="metric-value">42</div>
+        <div class="metric-foot"><span class="flat">年度增量不可还原</span></div>
+      </div>
+      <div class="metric">
+        <div class="metric-head">
+          <span class="metric-icon" style="color:#39c5cf;background:rgba(57,197,207,.12)">◷</span>
+          <span class="metric-label">贡献天数</span>
+        </div>
+        <div class="metric-value">183</div>
+        <div class="metric-foot"><span class="up">↑ 8%</span> <span style="color:#6e7681">vs 2024 (169)</span></div>
+      </div>
+      <div class="metric">
+        <div class="metric-head">
+          <span class="metric-icon" style="color:#58a6ff;background:rgba(88,166,255,.12)">⇄</span>
+          <span class="metric-label">参与的 PR 数</span>
+        </div>
+        <div class="metric-value">86</div>
+        <div class="metric-foot"><span class="up">↑ 34%</span> <span style="color:#6e7681">vs 2024 (64)</span></div>
+      </div>
+      <div class="metric">
+        <div class="metric-head">
+          <span class="metric-icon" style="color:#f85149;background:rgba(248,81,73,.12)">!</span>
+          <span class="metric-label">创建的 Issues 数</span>
+        </div>
+        <div class="metric-value">52</div>
+        <div class="metric-foot"><span class="up">↑ 21%</span> <span style="color:#6e7681">vs 2024 (43)</span></div>
+      </div>
+      <div class="metric">
+        <div class="metric-head">
+          <span class="metric-icon" style="color:#f778ba;background:rgba(247,120,186,.12)">◐</span>
+          <span class="metric-label">代码评审数</span>
+        </div>
+        <div class="metric-value">124</div>
+        <div class="metric-foot"><span class="up">↑ 41%</span> <span style="color:#6e7681">vs 2024 (88)</span></div>
+      </div>
+    </section>
+
+    <section class="mid-grid" aria-label="贡献热力图与年度亮点">
+      <div class="card heatmap-card">
+        <div class="card-head">
+          <h2 class="card-title"><span class="ico">▦</span>全年贡献热力图</h2>
+          <span class="card-note">共 1,248 次贡献 · 183 天有贡献</span>
+        </div>
+        <div class="heatmap heatmap-full" id="fullHeatmap" aria-label="全年贡献热力图示意"></div>
+        <div class="heat-legend">
+          <span>少</span>
+          <i style="background:#182029"></i>
+          <i style="background:#0e4429"></i>
+          <i style="background:#006d32"></i>
+          <i style="background:#26a641"></i>
+          <i style="background:#39d353"></i>
+          <span>多</span>
+        </div>
+      </div>
+
+      <div class="card streak-card">
+        <div class="streak-row">
+          <span class="streak-ico">🔥</span>
+          <div>
+            <div class="k">最长连续贡献</div>
+            <div class="v">38 天</div>
+          </div>
+        </div>
+        <div class="streak-row">
+          <span class="streak-ico">🌱</span>
+          <div>
+            <div class="k">本年首次提交</div>
+            <div class="v">01.02 <span style="font-size:9px;color:#6e7681;font-weight:400">(第 2 天)</span></div>
+          </div>
+        </div>
+        <div class="quote">
+          <p>“代码不只是工作，<br>更是让想法变成现实的方式。”</p>
+          <span>— The Octocat，继续加油！</span>
+        </div>
+      </div>
+
+      <div class="card other-card" style="display:flex;flex-direction:column">
+        <h2 class="card-title"><span class="ico">▤</span>2025 年度其他数据</h2>
+        <div class="stat-list">
+          <div class="stat-row"><span class="left">公开仓库</span><span class="v">28</span></div>
+          <div class="stat-row"><span class="left">当前 Star</span><span class="v">156</span></div>
+          <div class="stat-row"><span class="left">当前 Fork</span><span class="v">42</span></div>
+          <div class="stat-row"><span class="left">年度新增仓库</span><span class="v">6</span></div>
+          <div class="stat-row"><span class="left">Gists 数量</span><span class="v">6</span></div>
+          <div class="stat-row"><span class="left">主要开发语言</span><span class="v" style="font-family:var(--cn)">Java</span></div>
+          <div class="stat-row"><span class="left">最近一次贡献</span><span class="v">12.31</span></div>
+        </div>
+        <p class="stat-note">年度指标与当前状态严格区分，公开 API 无法可靠还原的指标不展示。</p>
+      </div>
+    </section>
+
+    <section class="bottom-grid" aria-label="年度分析">
+      <div class="card">
+        <div class="card-head">
+          <h2 class="card-title"><span class="ico">▤</span>年度热门仓库</h2>
+          <span class="card-note">Top 5</span>
+        </div>
+        <table class="repo-table">
+          <thead>
+            <tr>
+              <th>#</th><th>仓库</th><th>语言</th><th class="num">Star</th><th class="num">Fork</th><th class="num">提交</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="rank">1</span></td>
+              <td><span class="repo-name">ai-project-platform</span><span class="repo-desc">AI 智能体项目管理平台</span></td>
+              <td><span class="lang-pill"><span class="dot" style="background:#b07219"></span>Java</span></td>
+              <td class="num">48</td><td class="num">12</td><td class="num">412</td>
+            </tr>
+            <tr>
+              <td><span class="rank">2</span></td>
+              <td><span class="repo-name">backend-service</span><span class="repo-desc">后端服务框架</span></td>
+              <td><span class="lang-pill"><span class="dot" style="background:#b07219"></span>Java</span></td>
+              <td class="num">36</td><td class="num">8</td><td class="num">298</td>
+            </tr>
+            <tr>
+              <td><span class="rank">3</span></td>
+              <td><span class="repo-name">vue-admin</span><span class="repo-desc">后台管理系统</span></td>
+              <td><span class="lang-pill"><span class="dot" style="background:#3178c6"></span>TS</span></td>
+              <td class="num">24</td><td class="num">6</td><td class="num">186</td>
+            </tr>
+            <tr>
+              <td><span class="rank">4</span></td>
+              <td><span class="repo-name">learning-notes</span><span class="repo-desc">学习笔记与总结</span></td>
+              <td><span class="lang-pill"><span class="dot" style="background:#083fa1"></span>MD</span></td>
+              <td class="num">18</td><td class="num">4</td><td class="num">132</td>
+            </tr>
+            <tr>
+              <td><span class="rank">5</span></td>
+              <td><span class="repo-name">tools</span><span class="repo-desc">开发工具集</span></td>
+              <td><span class="lang-pill"><span class="dot" style="background:#3572a5"></span>Python</span></td>
+              <td class="num">12</td><td class="num">3</td><td class="num">86</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="stat-note">按所选年度内可归因提交数排序；提交数不可完整获取的仓库以 Star 数为次级排序。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2 class="card-title"><span class="ico">◔</span>编程语言占比</h2>
+          <span class="card-note">25 个仓库</span>
+        </div>
+        <div class="donut-wrap">
+          <div class="donut" style="background:conic-gradient(#e3b341 0 41.3%, #3178c6 41.3% 70.1%, #2ea043 70.1% 78.6%, #f1e05a 78.6% 84.9%, #6e7681 84.9% 90.6%, #a371f7 90.6% 100%)">
+            <div class="donut-center"><b>1,248</b><span>次贡献</span></div>
+          </div>
+          <div class="legend">
+            <div class="legend-row"><span class="dot" style="background:#e3b341"></span><span class="name">Java</span><span class="pct">41.3%</span></div>
+            <div class="legend-row"><span class="dot" style="background:#3178c6"></span><span class="name">TypeScript</span><span class="pct">28.8%</span></div>
+            <div class="legend-row"><span class="dot" style="background:#2ea043"></span><span class="name">Python</span><span class="pct">8.5%</span></div>
+            <div class="legend-row"><span class="dot" style="background:#f1e05a"></span><span class="name">JavaScript</span><span class="pct">6.3%</span></div>
+            <div class="legend-row"><span class="dot" style="background:#6e7681"></span><span class="name">Markdown</span><span class="pct">5.7%</span></div>
+            <div class="legend-row"><span class="dot" style="background:#a371f7"></span><span class="name">其他</span><span class="pct">9.4%</span></div>
+          </div>
+        </div>
+        <p class="stat-note">按仓库语言字节数聚合；仅统计可获取语言的公开仓库。</p>
+      </div>
+
+      <div class="card" style="display:flex;flex-direction:column">
+        <div class="card-head">
+          <h2 class="card-title"><span class="ico">▥</span>年度贡献趋势</h2>
+          <span class="card-note">2025 年</span>
+        </div>
+        <div class="chart" id="trendBars" aria-label="月度贡献柱状图示意"></div>
+        <div class="chart-x">
+          <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span>
+          <span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span>
+        </div>
+        <div class="trend-foot">
+          <div class="trend-mini">
+            <span class="ico">▤</span>
+            <div><div class="k">月均贡献</div><div class="v">104.0 次</div></div>
+          </div>
+          <div class="trend-mini">
+            <span class="ico" style="background:rgba(63,185,80,.1);color:#3fb950">🔥</span>
+            <div><div class="k">最长连续</div><div class="v">38 天</div></div>
+          </div>
+        </div>
+        <p class="stat-note">按月聚合全部 GitHub 贡献（含提交、PR、Issue、Review）。</p>
+      </div>
+
+      <div class="card" style="display:flex;flex-direction:column">
+        <div class="card-head">
+          <h2 class="card-title"><span class="ico">★</span>开发活跃度</h2>
+        </div>
+        <div class="activity-list">
+          <div>
+            <div class="activity-row"><span class="k">上次提交</span><span class="v">12.31</span></div>
+          </div>
+          <div>
+            <div class="activity-row"><span class="k">活跃仓库占比</span><span class="v">17.9%</span></div>
+            <div class="progress"><span style="width:17.9%"></span></div>
+          </div>
+          <div>
+            <div class="activity-row"><span class="k">PR 合并数量</span><span class="v">64</span></div>
+          </div>
+          <div>
+            <div class="activity-row"><span class="k">平均 PR 合并时间</span><span class="v">2.3 天</span></div>
+          </div>
+          <div>
+            <div class="activity-row"><span class="k">Issue 处理率</span><span class="v">65%</span></div>
+            <div class="progress"><span style="width:65%"></span></div>
+          </div>
+        </div>
+        <p class="activity-foot">活跃仓库 5 个 · 年度内有归因提交记录的仓库数。<br>愿 2026 你继续在代码的世界里探索、创造、成长！</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>GitHub Yearly Report · 视觉 Demo</span>
+    <span class="mono">数据为演示样例 · 正式实现从 GitHub 公开 API 获取</span>
+  </footer>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+  const HEAT_LEVELS = ['#182029', '#0e4429', '#006d32', '#26a641', '#39d353'];
+
+  function seededRandom(seed) {
+    let s = seed >>> 0;
+    return function () {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  }
+
+  function buildHeatmap(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const rand = seededRandom(20250101);
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 371; i++) {
+      const cell = document.createElement('i');
+      const r = rand();
+      let level = 0;
+      if (r > 0.52) level = 1;
+      if (r > 0.72) level = 2;
+      if (r > 0.86) level = 3;
+      if (r > 0.94) level = 4;
+      cell.dataset.l = String(level);
+      cell.style.background = HEAT_LEVELS[level];
+      cell.title = '演示数据';
+      frag.appendChild(cell);
+    }
+    el.appendChild(frag);
+  }
+
+  function buildTrend() {
+    const values = [86, 74, 102, 95, 118, 126, 142, 120, 98, 88, 112, 87];
+    const max = Math.max.apply(null, values);
+    const wrap = document.getElementById('trendBars');
+    if (!wrap) return;
+    values.forEach(function (v, i) {
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.height = Math.max(8, (v / max) * 100) + '%';
+      bar.title = (i + 1) + ' 月 · ' + v + ' 次贡献';
+      wrap.appendChild(bar);
+    });
+  }
+
+  function setView(view, updateHistory) {
+    document.body.dataset.view = view;
+    if (updateHistory !== false) {
+      const base = location.pathname + location.search;
+      history.replaceState(null, '', view === 'full' ? base + '#full' : base);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showFull() { setView('full'); }
+  function showWrapped() { setView('wrapped'); }
+
+  var toastTimer;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 1800);
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(location.href);
+      toast('已复制分享链接');
+    } catch (err) {
+      toast('复制失败，请手动复制地址栏');
+    }
+  }
+
+  function exportCard() {
+    toast('演示版：导出功能将在正式实现中接入');
+  }
+
+  buildHeatmap('miniHeatmap');
+  buildHeatmap('fullHeatmap');
+  buildTrend();
+
+  // Vite 会把内联脚本当作 module 执行，显式挂到 window 供内联 onclick 使用
+  window.showFull = showFull;
+  window.showWrapped = showWrapped;
+  window.copyLink = copyLink;
+  window.exportCard = exportCard;
+
+  if (location.hash === '#full') setView('full', false);
+</script>
+</body>
+</html>

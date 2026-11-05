@@ -4,11 +4,13 @@ import { useReport } from '../hooks/useReport'
 import { hasGithubToken, setGithubToken } from '../api/http'
 import { openGithubLogin } from '../api/oauth'
 import DevTokenDialog from '../components/DevTokenDialog'
+import WrappedSummary from '../components/WrappedSummary'
+import LoadingScreen from '../components/LoadingScreen'
 import { copyText, exportElementAsPng } from '../utils/export-image'
 import ReportHeader from '../components/ReportHeader'
 import MetricCards from '../components/MetricCards'
 import ContributionHeatmap from '../components/ContributionHeatmap'
-import ContributionHighlights from '../components/ContributionHighlights'
+
 import OtherStatsPanel from '../components/OtherStatsPanel'
 import RepositoryRanking from '../components/RepositoryRanking'
 import LanguageChart from '../components/LanguageChart'
@@ -19,7 +21,7 @@ const CURRENT_YEAR = new Date().getFullYear()
 
 function ReportPage() {
   const { username: rawUsername } = useParams<{ username: string }>()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [exporting, setExporting] = useState(false)
   const [copied, setCopied] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -40,8 +42,25 @@ function ReportPage() {
       : CURRENT_YEAR
   }, [searchParams])
 
-  const { state, reload } = useReport(username, year)
+  const { state, reload, stage } = useReport(username, year)
   const [loggedIn, setLoggedIn] = useState(() => hasGithubToken())
+
+  // 默认展示分享摘要；?view=full 进入完整仪表盘
+  const view = searchParams.get('view') === 'full' ? 'full' : 'wrapped'
+
+  function handleViewFull() {
+    const next = new URLSearchParams(searchParams)
+    next.set('view', 'full')
+    setSearchParams(next)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handleViewWrapped() {
+    const next = new URLSearchParams(searchParams)
+    next.delete('view')
+    setSearchParams(next)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   /** 登录成功 / 退出后刷新登录态并重新加载报告 */
   function handleLogin() {
@@ -67,22 +86,9 @@ function ReportPage() {
     )
   }
 
-  // 加载状态：显示当前数据获取阶段
+  // 加载状态：按真实请求阶段展示生成过程动画
   if (state.phase === 'loading') {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4">
-        <div className="animate-spin w-10 h-10 border-2 border-[#30363d] border-t-[#2ea043] rounded-full" />
-        <div className="text-center">
-          <p className="text-lg text-[#e6edf3]">
-            正在获取 <span className="text-[#58a6ff]">{username}</span> 的{' '}
-            {year} 年 GitHub 数据…
-          </p>
-          <p className="mt-1 text-sm text-[#8b949e]">
-            从 GitHub 公开 API 拉取用户资料、仓库、贡献日历与活动数据
-          </p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen username={username} year={year} stage={stage} />
   }
 
   // 错误状态
@@ -147,6 +153,32 @@ function ReportPage() {
       : loggedIn
         ? '降级数据模式'
         : '匿名数据模式'
+  const modeTone = report.dataMode === 'graphql' ? 'complete' : 'partial'
+  const displayName = report.user.displayName || report.header.username
+  const streakDays = report.activity.longestStreak.value?.days
+  const firstContribution = report.activity.firstContribution.value
+  // 连续贡献 / 首次提交并入热力图顶部统计行，避免单独占一张卡片
+  const heatmapExtraStats = [
+    {
+      label: '最长连续',
+      value: streakDays === null || streakDays === undefined ? '—' : `${streakDays} 天`,
+    },
+    {
+      label: '首次提交',
+      value: firstContribution ? firstContribution.slice(5) : '—',
+    },
+  ]
+
+  if (view === 'wrapped') {
+    return (
+      <WrappedSummary
+        report={report}
+        modeLabel={modeLabel}
+        modeTone={modeTone}
+        onViewFull={handleViewFull}
+      />
+    )
+  }
 
   async function handleExport() {
     if (!reportRef.current || exporting) return
@@ -161,8 +193,13 @@ function ReportPage() {
   }
 
   async function handleCopyLink() {
-    const url = `${window.location.origin}/report/${encodeURIComponent(report.header.username)}?year=${report.header.year}`
-    const ok = await copyText(url)
+    const url = new URL(
+      `/report/${encodeURIComponent(report.header.username)}`,
+      window.location.origin,
+    )
+    url.searchParams.set('year', String(report.header.year))
+    if (view === 'full') url.searchParams.set('view', 'full')
+    const ok = await copyText(url.toString())
     if (ok) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
@@ -171,6 +208,13 @@ function ReportPage() {
 
   const headerActions = (
     <>
+      <button
+        type="button"
+        onClick={handleViewWrapped}
+        className="h-7 text-[10.5px] border border-white/10 hover:border-white/20 text-[#9aa7b6] hover:text-[#e6edf3] rounded-md px-2.5 transition"
+      >
+        ← 返回摘要
+      </button>
       {copied && (
         <span className="text-[10px] text-[#3fb950]" role="status">
           ✓ 已复制
@@ -266,19 +310,17 @@ function ReportPage() {
             />
           </section>
 
-          {/* 热力图 + 贡献亮点 + 年度其他数据 */}
-          <section className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2.8fr)_minmax(0,1fr)_minmax(0,1.3fr)] 2xl:grid-cols-[minmax(0,4.4fr)_minmax(0,1fr)_minmax(0,1.8fr)]">
-            <div className="min-w-0">
-              <ContributionHeatmap
-                days={report.heatmap.days}
-                totalContributions={report.heatmap.totalContributions}
-                endDate={report.header.endDate}
-              />
-            </div>
-            <ContributionHighlights
-              activity={report.activity}
-              displayName={report.user.displayName || report.header.username}
-              username={report.header.username}
+          {/* 热力图 + 年度其他数据：热力图占主宽度，连续贡献/首次提交/寄语合并进卡片 */}
+          <section className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3.6fr)_minmax(0,1fr)]">
+            <ContributionHeatmap
+              days={report.heatmap.days}
+              totalContributions={report.heatmap.totalContributions}
+              endDate={report.header.endDate}
+              extraStats={heatmapExtraStats}
+              quote={{
+                text: '代码不只是工作，更是让想法变成现实的方式。',
+                author: `${displayName}，继续加油！`,
+              }}
             />
             <OtherStatsPanel extra={report.extra} />
           </section>

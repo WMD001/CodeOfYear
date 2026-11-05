@@ -149,38 +149,51 @@ function reportTitle(year = 2026) {
 }
 
 describe('ReportPage 报告页', () => {
-  it('加载中显示进度提示', () => {
+  it('加载中显示生成过程动画', () => {
     vi.mocked(loadYearlyReport).mockReturnValue(new Promise(() => undefined))
     renderReport('/report/octocat?year=2026')
-    expect(
-      screen.getByText((content) => content.includes('正在获取')),
-    ).toBeInTheDocument()
+    expect(screen.getByText('GENERATING WRAPPED')).toBeInTheDocument()
+    expect(screen.getByText('读取用户资料')).toBeInTheDocument()
   })
 
-  it('加载成功后展示报告标题与指标卡', async () => {
+  it('默认展示年度摘要，并可切换到完整仪表盘', async () => {
     vi.mocked(loadYearlyReport).mockResolvedValue(makeReport())
+    const user = userEvent.setup()
     renderReport('/report/octocat?year=2026')
 
     await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'octocat' }),
+      ).toBeInTheDocument()
+    })
+
+    // 摘要三栏：总览 / 语言 / 关键词
+    expect(screen.getByText('总览')).toBeInTheDocument()
+    expect(screen.getByText('总提交')).toBeInTheDocument()
+    expect(screen.getByText('总贡献')).toBeInTheDocument()
+    expect(screen.getByText('公开仓库')).toBeInTheDocument()
+    expect(screen.getByText('编程语言')).toBeInTheDocument()
+    expect(screen.getByText('年度关键词')).toBeInTheDocument()
+    expect(screen.getByText(/匿名数据模式/)).toBeInTheDocument()
+
+    // 切换到完整仪表盘
+    await user.click(
+      screen.getAllByRole('button', { name: /查看完整仪表盘/ })[0],
+    )
+    await waitFor(() => {
       expect(reportTitle()).toBeInTheDocument()
     })
-    // 核心指标卡
     expect(screen.getByText('总提交次数')).toBeInTheDocument()
-    expect(screen.getByText('年度仓库数')).toBeInTheDocument()
-    expect(screen.getByText('贡献天数')).toBeInTheDocument()
-    // 数据模式提示（匿名）
-    expect(screen.getByText(/匿名数据模式/)).toBeInTheDocument()
-    // 图1 布局区块
-    expect(screen.getByText('开发活跃度')).toBeInTheDocument()
-    expect(screen.getByText('年度其他数据')).toBeInTheDocument()
-    expect(screen.getAllByText('最长连续贡献').length).toBeGreaterThan(0)
-    expect(screen.getByText('本年首次提交')).toBeInTheDocument()
-    expect(screen.getByText(/代码不只是工作/)).toBeInTheDocument()
-    expect(screen.getByText('编程语言占比')).toBeInTheDocument()
     expect(screen.getByText('年度贡献趋势')).toBeInTheDocument()
-    expect(screen.getByText(/常用开发语言/)).toBeInTheDocument()
-    // 同比展示（lastYear 有数据时）
-    expect(screen.getAllByText(/vs 2025/).length).toBeGreaterThan(0)
+    expect(screen.getByText('开发活跃度')).toBeInTheDocument()
+
+    // 返回摘要
+    await user.click(screen.getByRole('button', { name: /返回摘要/ }))
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'octocat' }),
+      ).toBeInTheDocument()
+    })
   })
 
   it('加载失败显示错误与重试按钮', async () => {
@@ -209,17 +222,25 @@ describe('ReportPage 报告页', () => {
     vi.mocked(loadYearlyReport).mockResolvedValue(makeReport())
     renderReport('/report/octocat?year=9999')
     await waitFor(() => {
-      expect(reportTitle()).toBeInTheDocument()
+      expect(loadYearlyReport).toHaveBeenCalledWith(
+        'octocat',
+        new Date().getFullYear(),
+        expect.any(Function),
+      )
     })
   })
 
-  it('复制分享链接按钮存在', async () => {
+  it('摘要提供复制链接与导出分享卡入口', async () => {
     vi.mocked(loadYearlyReport).mockResolvedValue(makeReport())
     renderReport('/report/octocat?year=2026')
     await waitFor(() => {
-      expect(reportTitle()).toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'octocat' }),
+      ).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: '复制分享链接' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '导出 PNG' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '复制链接' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '导出分享卡' }),
+    ).toBeInTheDocument()
   })
 })

@@ -11,6 +11,10 @@ interface Props {
   days: HeatmapDay[]
   totalContributions: number
   endDate: string
+  /** 额外统计项（如最长连续、首次提交），显示在顶部统计行 */
+  extraStats?: Array<{ label: string; value: string }>
+  /** 底部图例右侧的年度寄语 */
+  quote?: { text: string; author: string }
 }
 
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -50,6 +54,8 @@ export default function ContributionHeatmap({
   days,
   totalContributions,
   endDate,
+  extraStats,
+  quote,
 }: Props) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [tip, setTip] = useState<HoverTip | null>(null)
@@ -119,6 +125,13 @@ export default function ContributionHeatmap({
           共 <span className="text-[#dbe4ee] font-medium">{formatNumber(totalContributions)}</span> 次贡献
           <span className="mx-1.5 text-[#334052]">·</span>
           <span className="text-[#3fb950] font-medium">{activeDays}</span> 天有贡献
+          {extraStats?.map((stat) => (
+            <span key={stat.label}>
+              <span className="mx-1.5 text-[#334052]">·</span>
+              {stat.label}{' '}
+              <span className="text-[#dbe4ee] font-medium">{stat.value}</span>
+            </span>
+          ))}
           {cutoff && (
             <>
               <span className="mx-1.5 text-[#334052]">·</span>
@@ -198,18 +211,26 @@ export default function ContributionHeatmap({
             </div>
           </div>
 
-          {/* 颜色图例 */}
-          <div className="mt-auto pt-3 flex items-center gap-1.5 text-[10px] text-[#6e7681]">
-            <span className="mr-0.5">贡献少</span>
-            {LEGEND.map(([color, label]) => (
-              <span
-                key={label}
-                className="w-3 h-3 rounded-[2.5px] inline-block border border-white/[0.04]"
-                style={{ backgroundColor: color }}
-                title={label}
-              />
-            ))}
-            <span className="ml-0.5">贡献多</span>
+          {/* 颜色图例 + 年度寄语 */}
+          <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3">
+            <div className="flex items-center gap-1.5 text-[10px] text-[#6e7681]">
+              <span className="mr-0.5">贡献少</span>
+              {LEGEND.map(([color, label]) => (
+                <span
+                  key={label}
+                  className="w-3 h-3 rounded-[2.5px] inline-block border border-white/[0.04]"
+                  style={{ backgroundColor: color }}
+                  title={label}
+                />
+              ))}
+              <span className="ml-0.5">贡献多</span>
+            </div>
+            {quote && (
+              <p className="text-[10px] italic leading-relaxed text-[#9aa7b6]">
+                “{quote.text}”
+                <span className="ml-1 not-italic text-[#6e7681]">— {quote.author}</span>
+              </p>
+            )}
           </div>
         </div>
       )}
