@@ -27,8 +27,11 @@ export async function exportElementAsPng(
     // 宽图（热力图较长）采用全宽导出
     const dataUrl = await toPng(element, {
       pixelRatio: 2,
-      backgroundColor: '#0d1117',
+      backgroundColor: '#0b1120',
       cacheBust: true,
+      // 头部的分享/导出/Token 操作不进入图片
+      filter: (node) =>
+        !(node instanceof HTMLElement && node.dataset.exportIgnore === 'true'),
       width: element.scrollWidth,
       height: element.scrollHeight,
       style: {

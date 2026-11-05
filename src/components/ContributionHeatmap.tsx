@@ -1,16 +1,11 @@
 /**
  * ContributionHeatmap：全年贡献热力图（GitHub 风格贡献日历）
- * ECharts 热力图：
- * - x 轴 = 周（以当年 1 月 1 日所在周的周一为起点）
- * - y 轴 = 星期（周一~周日）
- * - 颜色按当日贡献数动态分档（贡献少 → 贡献多）
- * - 悬停显示日期与当日贡献总数
- * - 未来日期不绘制；月份标签按月份首日位置显示
+ * 使用 CSS Grid 渲染，格子随容器宽度自适应并保持正方形；
+ * 悬停显示日期、星期与当日贡献数；未来日期不绘制。
  */
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { HeatmapDay } from '../types/report'
 import { dayOfYear, formatNumber } from '../utils/date'
-import { useECharts } from '../utils/echarts'
 
 interface Props {
   days: HeatmapDay[]
@@ -19,10 +14,23 @@ interface Props {
 }
 
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-const CELL = 14
-const CELL_GAP = 3
-/** 图表容器固定高度：7 行格子（17px 行距）+ 月份标签，保持 GitHub 正方形格子比例，禁止 flex 拉伸 */
-const CHART_HEIGHT = 168
+const WEEKDAY_LABELS = new Set([0, 2, 4, 6])
+
+const LEVEL_COLORS: Record<string, string> = {
+  NONE: '#182029',
+  FIRST_QUARTILE: '#0e4429',
+  SECOND_QUARTILE: '#006d32',
+  THIRD_QUARTILE: '#26a641',
+  FOURTH_QUARTILE: '#39d353',
+}
+
+const LEGEND = [
+  ['#182029', '0'],
+  ['#0e4429', '少'],
+  ['#006d32', '中'],
+  ['#26a641', '较多'],
+  ['#39d353', '多'],
+] as const
 
 /** 星期序号（周一=0） */
 function weekdayIndex(dateStr: string): number {
@@ -30,197 +38,194 @@ function weekdayIndex(dateStr: string): number {
   return (d + 6) % 7
 }
 
+interface HoverTip {
+  date: string
+  weekday: string
+  count: number
+  x: number
+  y: number
+}
+
 export default function ContributionHeatmap({
   days,
   totalContributions,
   endDate,
 }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const activeDays = days.filter((d) => d.contributionCount > 0).length
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [tip, setTip] = useState<HoverTip | null>(null)
   const year = Number(endDate.slice(0, 4))
+  const activeDays = days.filter((d) => d.contributionCount > 0).length
 
-  // 网格映射：weekday 行 × week 列
-  const grid = useMemo(() => {
-    const offset = weekdayIndex(`${year}-01-01`) // 1 月 1 日距其所在周周一的偏移
+  const { cells, totalWeeks, monthLabels } = useMemo(() => {
+    const offset = weekdayIndex(`${year}-01-01`)
     const daysInYear = year % 4 === 0 ? 366 : 365
     const totalWeeks = Math.ceil((daysInYear + offset) / 7)
+    const byDate = new Map(days.map((d) => [d.date, d]))
 
-    const countByKey = new Map<string, number>()
-    for (const d of days) {
-      const pos = dayOfYear(d.date) - 1 + offset
-      const week = Math.floor(pos / 7)
-      const wd = pos % 7
-      countByKey.set(`${week}:${wd}`, d.contributionCount)
-    }
+    const cells = Array.from({ length: daysInYear }, (_, i) => {
+      const d = new Date(`${year}-01-01T00:00:00Z`)
+      d.setUTCDate(d.getUTCDate() + i)
+      const date = d.toISOString().slice(0, 10)
+      const pos = i + offset
+      return {
+        date,
+        week: Math.floor(pos / 7),
+        weekday: pos % 7,
+        day: byDate.get(date),
+        future: date > endDate,
+      }
+    })
 
-    // 月份标签：每月 1 日所在周
-    const monthLabelByWeek = new Map<number, string>()
+    const monthLabels: Array<{ month: number; week: number }> = []
     for (let m = 1; m <= 12; m++) {
       const first = `${year}-${String(m).padStart(2, '0')}-01`
-      const pos = dayOfYear(first) - 1 + offset
-      monthLabelByWeek.set(Math.floor(pos / 7), `${m}月`)
+      monthLabels.push({
+        month: m,
+        week: Math.floor((dayOfYear(first) - 1 + offset) / 7),
+      })
     }
 
-    const data: [number, number, number][] = []
-    let max = 0
-    for (let week = 0; week < totalWeeks; week++) {
-      for (let wd = 0; wd < 7; wd++) {
-        const count = countByKey.get(`${week}:${wd}`) ?? 0
-        data.push([week, wd, count])
-        if (count > max) max = count
-      }
-    }
+    return { cells, totalWeeks, monthLabels }
+  }, [days, endDate, year])
 
-    return { data, totalWeeks, monthLabelByWeek, max }
-  }, [days, year])
+  const columns = `28px repeat(${totalWeeks}, minmax(0, 1fr))`
+  const cutoff = endDate !== `${year}-12-31` ? `截止 ${endDate}` : null
 
-  // 动态分档颜色（基于当年最大贡献数）
-  const pieces = useMemo(() => {
-    const max = Math.max(grid.max, 1)
-    const mk = (min: number, max: number, color: string, label: string) => ({
-      min,
-      max,
-      color,
-      label,
+  function showTip(e: React.MouseEvent<HTMLDivElement>, date: string, count: number) {
+    const host = cardRef.current
+    if (!host) return
+    const hostRect = host.getBoundingClientRect()
+    const cellRect = e.currentTarget.getBoundingClientRect()
+    setTip({
+      date,
+      weekday: WEEKDAYS[weekdayIndex(date)],
+      count,
+      x: cellRect.left - hostRect.left + cellRect.width / 2,
+      y: cellRect.top - hostRect.top,
     })
-    return [
-      mk(0, 0, '#161b22', '0'),
-      mk(0.0001, max * 0.25, '#0e4429', '少'),
-      mk(max * 0.25 + 0.0001, max * 0.5, '#006d32', '中'),
-      mk(max * 0.5 + 0.0001, max * 0.75, '#26a641', '较多'),
-      mk(max * 0.75 + 0.0001, max, '#39d353', '多'),
-    ]
-  }, [grid.max])
-
-  const option = useMemo(() => {
-    return {
-      tooltip: {
-        position: 'top',
-        backgroundColor: '#1c2128',
-        borderColor: '#3d444d',
-        textStyle: { color: '#e6edf3', fontSize: 12 },
-        formatter: (p: { value: [number, number, number] }) => {
-          const week = p.value[0]
-          const wd = p.value[1]
-          const count = p.value[2]
-          // 反推日期
-          const offset = weekdayIndex(`${year}-01-01`)
-          const doy = week * 7 + wd - offset + 1
-          const d = new Date(`${year}-01-01T00:00:00Z`)
-          d.setUTCDate(d.getUTCDate() + doy - 1)
-          const dateStr = d.toISOString().slice(0, 10)
-          if (dateStr > endDate) return ''
-          return `<div style="font-size:12px">
-            <div>${dateStr}（${WEEKDAYS[wd]}）</div>
-            <div style="font-weight:600;color:#3fb950">${formatNumber(count)} 次贡献</div>
-          </div>`
-        },
-      },
-      grid: {
-        top: 4,
-        left: 34,
-        right: 8,
-        bottom: 10,
-        containLabel: false,
-      },
-      xAxis: {
-        type: 'category',
-        data: Array.from({ length: grid.totalWeeks }, (_, i) => i),
-        splitArea: { show: false },
-        axisLine: { show: false },
-        axisTick: { show: false },
-        axisLabel: {
-          fontSize: 10,
-          color: '#8b949e',
-          interval: 0,
-          formatter: (_v: string, i: number) => grid.monthLabelByWeek.get(i) ?? '',
-          margin: 6,
-        },
-      },
-      yAxis: {
-        type: 'category',
-        data: WEEKDAYS,
-        splitArea: { show: false },
-        axisLine: { show: false },
-        axisTick: { show: false },
-        axisLabel: {
-          fontSize: 10,
-          color: '#8b949e',
-          formatter: (v: string) => (v === '周一' || v === '周三' || v === '周五' || v === '周日' ? v : ''),
-        },
-      },
-      visualMap: {
-        type: 'piecewise',
-        show: false,
-        pieces,
-        seriesIndex: 0,
-        dimension: 2,
-      },
-      series: [
-        {
-          type: 'heatmap',
-          data: grid.data,
-          itemStyle: {
-            borderColor: '#0d1117',
-            borderWidth: 2,
-            borderRadius: 2,
-          },
-          emphasis: {
-            itemStyle: { borderColor: '#e6edf3', borderWidth: 1.5 },
-          },
-          progressive: 0,
-        },
-      ],
-    }
-  }, [grid, pieces, year, endDate])
-
-  useECharts(containerRef, option)
-
-  const chartWidth = grid.totalWeeks * (CELL + CELL_GAP) + 46
+  }
 
   return (
-    <div className="card p-5 flex flex-col min-w-0">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <h2 className="text-lg font-semibold text-[#e6edf3]">全年贡献热力图</h2>
-        <div className="flex items-center gap-3 text-xs text-[#8b949e]">
-          <span>
-            共 {formatNumber(totalContributions)} 次贡献 · {activeDays} 天有贡献
-          </span>
-          <span className="text-[#6e7681]">截止 {endDate}</span>
-        </div>
+    <div ref={cardRef} className="card relative p-5 flex flex-col min-w-0 h-full">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-[16px] font-semibold text-[#e6edf3]">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#3fb950" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+            <rect x="2" y="3" width="12" height="11" rx="2" />
+            <path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" />
+          </svg>
+          全年贡献热力图
+        </h2>
+        <p className="text-[11px] text-[#8b949e]">
+          共 <span className="text-[#dbe4ee] font-medium">{formatNumber(totalContributions)}</span> 次贡献
+          <span className="mx-1.5 text-[#334052]">·</span>
+          <span className="text-[#3fb950] font-medium">{activeDays}</span> 天有贡献
+          {cutoff && (
+            <>
+              <span className="mx-1.5 text-[#334052]">·</span>
+              <span className="text-[#5f6b7a]">{cutoff}</span>
+            </>
+          )}
+        </p>
       </div>
 
       {days.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center min-h-[200px] text-[#8b949e]">
+        <div className="flex flex-1 flex-col items-center justify-center min-h-[180px] text-[#8b949e]">
           <p>暂无贡献数据</p>
           <p className="mt-1 text-xs text-[#6e7681]">
             所选年度内未获取到可验证的贡献日历数据
           </p>
         </div>
       ) : (
-        <>
-          {/* 图表区：固定高度保持格子比例；外层 flex-1 让图表在卡片剩余空间垂直居中（与右侧面板等高时不留难看空白） */}
-          <div className="w-full flex-1 overflow-x-auto pb-1 flex flex-col items-center justify-center">
-            <div
-              ref={containerRef}
-              style={{ width: chartWidth, height: CHART_HEIGHT }}
-              className="shrink-0"
-            />
+        <div className="flex-1 flex flex-col justify-center mt-3">
+          <div className="overflow-x-auto pb-1">
+            <div className="min-w-[600px]">
+              {/* 月份标签 */}
+              <div
+                className="grid gap-x-[2px] mb-1.5"
+                style={{ gridTemplateColumns: columns }}
+              >
+                {monthLabels.map(({ month, week }) => (
+                  <span
+                    key={month}
+                    className="text-[10px] text-[#8b949e] whitespace-nowrap justify-self-start"
+                    style={{ gridColumn: week + 2, gridRow: 1 }}
+                  >
+                    {month}月
+                  </span>
+                ))}
+              </div>
+
+              {/* 星期 × 周格子 */}
+              <div
+                className="grid gap-x-[2px] gap-y-[2px]"
+                style={{ gridTemplateColumns: columns }}
+              >
+                {WEEKDAYS.map((label, i) =>
+                  WEEKDAY_LABELS.has(i) ? (
+                    <span
+                      key={label}
+                      className="text-[10px] text-[#6e7681] flex items-center justify-end pr-1 whitespace-nowrap"
+                      style={{ gridColumn: 1, gridRow: i + 1 }}
+                    >
+                      {label}
+                    </span>
+                  ) : null,
+                )}
+
+                {cells.map(({ date, week, weekday, day, future }) => {
+                  if (future) return null
+                  const count = day?.contributionCount ?? 0
+                  const level = day?.contributionLevel ?? 'NONE'
+                  return (
+                    <div
+                      key={date}
+                      role="img"
+                      aria-label={`${date} ${count} 次贡献`}
+                      title={`${date}（${WEEKDAYS[weekday]}）${count} 次贡献`}
+                      className="w-full aspect-square rounded-[2.5px] cursor-pointer transition-[outline] duration-100 hover:outline hover:outline-1 hover:outline-[#e6edf3]/70"
+                      style={{
+                        gridColumn: week + 2,
+                        gridRow: weekday + 1,
+                        backgroundColor: LEVEL_COLORS[level] ?? LEVEL_COLORS.NONE,
+                        outlineOffset: '1px',
+                      }}
+                      onMouseEnter={(e) => showTip(e, date, count)}
+                      onMouseLeave={() => setTip(null)}
+                    />
+                  )
+                })}
+              </div>
+            </div>
           </div>
-          {/* 颜色图例：贡献少 → 贡献多 */}
-          <div className="mt-3 flex items-center justify-end gap-1 text-[10px] text-[#6e7681]">
-            <span>贡献少</span>
-            {pieces.map((p) => (
+
+          {/* 颜色图例 */}
+          <div className="mt-auto pt-3 flex items-center gap-1.5 text-[10px] text-[#6e7681]">
+            <span className="mr-0.5">贡献少</span>
+            {LEGEND.map(([color, label]) => (
               <span
-                key={p.label}
-                className="w-3 h-3 rounded-[3px] inline-block border border-[#21262d]"
-                style={{ backgroundColor: p.color }}
-                title={`${p.label}（${p.min?.toFixed(2) ?? 0} ~ ${p.max?.toFixed(2) ?? ''}）`}
+                key={label}
+                className="w-3 h-3 rounded-[2.5px] inline-block border border-white/[0.04]"
+                style={{ backgroundColor: color }}
+                title={label}
               />
             ))}
-            <span>贡献多</span>
+            <span className="ml-0.5">贡献多</span>
           </div>
-        </>
+        </div>
+      )}
+
+      {tip && (
+        <div
+          className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-full rounded-md border border-[#334052] bg-[#1a2332] px-2.5 py-1.5 text-[11px] shadow-xl"
+          style={{ left: tip.x, top: tip.y - 6 }}
+        >
+          <div className="text-[#9aa7b6]">
+            {tip.date}（{tip.weekday}）
+          </div>
+          <div className="mt-0.5 font-medium text-[#3fb950]">
+            {tip.count > 0 ? `${formatNumber(tip.count)} 次贡献` : '无贡献'}
+          </div>
+        </div>
       )}
     </div>
   )

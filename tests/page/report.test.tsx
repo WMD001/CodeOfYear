@@ -140,6 +140,14 @@ function renderReport(path: string) {
   )
 }
 
+function reportTitle(year = 2026) {
+  return screen.getByText(
+    (_, el) =>
+      el?.tagName === 'H1' &&
+      el.textContent?.includes(`GitHub ${year} 年度开发者贡献报告`) === true,
+  )
+}
+
 describe('ReportPage 报告页', () => {
   it('加载中显示进度提示', () => {
     vi.mocked(loadYearlyReport).mockReturnValue(new Promise(() => undefined))
@@ -154,7 +162,7 @@ describe('ReportPage 报告页', () => {
     renderReport('/report/octocat?year=2026')
 
     await waitFor(() => {
-      expect(screen.getByText('GitHub 2026 年度开发者贡献报告')).toBeInTheDocument()
+      expect(reportTitle()).toBeInTheDocument()
     })
     // 核心指标卡
     expect(screen.getByText('总提交次数')).toBeInTheDocument()
@@ -169,7 +177,7 @@ describe('ReportPage 报告页', () => {
     expect(screen.getByText('本年首次提交')).toBeInTheDocument()
     expect(screen.getByText(/代码不只是工作/)).toBeInTheDocument()
     expect(screen.getByText('编程语言占比')).toBeInTheDocument()
-    expect(screen.getByText('提交趋势')).toBeInTheDocument()
+    expect(screen.getByText('年度贡献趋势')).toBeInTheDocument()
     expect(screen.getByText(/常用开发语言/)).toBeInTheDocument()
     // 同比展示（lastYear 有数据时）
     expect(screen.getAllByText(/vs 2025/).length).toBeGreaterThan(0)
@@ -186,9 +194,9 @@ describe('ReportPage 报告页', () => {
     })
     expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '返回首页' })).toBeInTheDocument()
-    // 错误态也可直接配置 Token（限流场景入口）
+    // 错误态提供 GitHub 登录入口（限流场景）
     expect(
-      screen.getByRole('button', { name: '配置 Token（可选）' }),
+      screen.getByRole('button', { name: '使用 GitHub 登录' }),
     ).toBeInTheDocument()
   })
 
@@ -201,7 +209,7 @@ describe('ReportPage 报告页', () => {
     vi.mocked(loadYearlyReport).mockResolvedValue(makeReport())
     renderReport('/report/octocat?year=9999')
     await waitFor(() => {
-      expect(screen.getByText('GitHub 2026 年度开发者贡献报告')).toBeInTheDocument()
+      expect(reportTitle()).toBeInTheDocument()
     })
   })
 
@@ -209,7 +217,7 @@ describe('ReportPage 报告页', () => {
     vi.mocked(loadYearlyReport).mockResolvedValue(makeReport())
     renderReport('/report/octocat?year=2026')
     await waitFor(() => {
-      expect(screen.getByText('GitHub 2026 年度开发者贡献报告')).toBeInTheDocument()
+      expect(reportTitle()).toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: '复制分享链接' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '导出 PNG' })).toBeInTheDocument()

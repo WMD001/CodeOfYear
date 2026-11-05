@@ -11,7 +11,7 @@
  *
  * 所有指标带数据状态（完整/部分/不支持/错误），禁止伪造数据。
  */
-import { getContributionsCollection, hasGithubToken } from '../api/github-graphql'
+import { getContributionsCollection } from '../api/github-graphql'
 import {
   getGists,
   getRepositoryCommits,
@@ -20,14 +20,17 @@ import {
   getUserRepositories,
   searchCommenterCount,
   searchIssueStats,
+  searchMergedPrDurations,
   searchPullRequestStats,
   searchReviewedPrCount,
 } from '../api/github-rest'
+import { hasGithubToken } from '../api/http'
 import { GithubApiError } from '../api/github-errors'
-import { complete, empty, unsupported } from '../types/data-status'
+import { complete, empty, error, unsupported } from '../types/data-status'
 import type {
   GithubCommit,
   GithubContributionDay,
+  GithubContributionsCollection,
   GithubLanguages,
   GithubRepository,
 } from '../types/github'
@@ -81,6 +84,24 @@ async function pool<T>(tasks: Array<() => Promise<T>>, concurrency: number): Pro
 /** 失败项提取：将池结果中的错误标记出来 */
 function isError<T>(v: T): v is T & Error {
   return v instanceof Error
+}
+
+/**
+ * 将可能失败的统计请求收敛为结果对象。
+ * Search API 限流（匿名 10 次/分钟）时不应阻塞整份报告，
+ * 失败项由调用方映射为 error 数据状态，而不是用 0 掩盖。
+ */
+async function settle<T>(
+  promise: Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; reason: string }> {
+  try {
+    return { ok: true, value: await promise }
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error && err.message ? err.message : '请求失败',
+    }
+  }
 }
 
 /** 计算每日贡献等级（GitHub 风格四级制） */
@@ -188,27 +209,55 @@ export async function loadYearlyReport(
   }
   const nonForkRepos = repos.filter((r) => !r.fork)
 
-  /* ---------- 3. 贡献日历 / 提交近似 ---------- */
-  const queryRepos = [...nonForkRepos]
-    .sort((a, b) => (b.pushedAt ?? '').localeCompare(a.pushedAt ?? ''))
-    .slice(0, hasToken ? TOKEN_REPO_QUERY_LIMIT : ANON_REPO_QUERY_LIMIT)
+  /* ---------- 3. GraphQL 贡献日历（已登录时优先，精确口径） ---------- */
+  let calendarDays: HeatmapDay[] = []
+  let calendarTotal = 0
+  let useGraphql = false
+  let graphqlError: string | undefined
+  let collection: GithubContributionsCollection | undefined
 
-  // 仓库级年度提交（用于总提交数与排行）
-  const commitResults = await pool(
-    queryRepos.map((r) => () =>
-      getRepositoryCommits(r.fullName.split('/')[0], r.name, startDate, endDate),
-    ),
-    3,
-  )
-  const commitsByRepo = new Map<string, GithubCommit[]>()
-  commitResults.forEach((res, i) => {
-    const repo = queryRepos[i]
-    if (!isError(res)) commitsByRepo.set(repo.fullName, res)
-  })
+  if (hasToken) {
+    try {
+      collection = await getContributionsCollection(username, startDate, endDate)
+      calendarDays = buildHeatmapDays(
+        collection.contributionCalendar.weeks.flatMap((w) => w.contributionDays),
+        startDate,
+        endDate,
+      )
+      calendarTotal = collection.contributionCalendar.totalContributions
+      useGraphql = true
+    } catch (err) {
+      // 降级到 REST 提交近似，并记录原因供用户排查
+      graphqlError = err instanceof Error ? err.message : '贡献日历获取失败'
+      console.warn(`[gyr] GraphQL 贡献日历不可用，降级为提交近似：${graphqlError}`)
+    }
+  }
+
+  /* ---------- 3b. 仓库级年度提交（排行 / 活跃仓库用） ---------- */
+  // GraphQL 模式：commitContributionsByRepository 一次拿全（精确，无请求开销）
+  // 降级模式：REST 逐仓库拉取提交并按作者归因（覆盖最近 N 个仓库，近似）
+  const queryRepos = useGraphql
+    ? []
+    : [...nonForkRepos]
+        .sort((a, b) => (b.pushedAt ?? '').localeCompare(a.pushedAt ?? ''))
+        .slice(0, hasToken ? TOKEN_REPO_QUERY_LIMIT : ANON_REPO_QUERY_LIMIT)
+
+  const restCommitsByRepo = new Map<string, GithubCommit[]>()
+  if (queryRepos.length > 0) {
+    const commitResults = await pool(
+      queryRepos.map((r) => () =>
+        getRepositoryCommits(r.fullName.split('/')[0], r.name, startDate, endDate),
+      ),
+      3,
+    )
+    commitResults.forEach((res, i) => {
+      if (!isError(res)) restCommitsByRepo.set(queryRepos[i].fullName, res)
+    })
+  }
 
   // 归因提交：按 author.login 匹配目标用户（无法归因的不计入）
   const attributedCommits = new Map<string, GithubCommit[]>()
-  for (const [fullName, commits] of commitsByRepo) {
+  for (const [fullName, commits] of restCommitsByRepo) {
     const mine = commits.filter(
       (c) => c.authorLogin && c.authorLogin.toLowerCase() === username.toLowerCase(),
     )
@@ -226,32 +275,18 @@ export async function loadYearlyReport(
     }
   }
 
-  // GraphQL 贡献日历（有 Token 时）
-  let calendarDays: HeatmapDay[] = []
-  let calendarTotal = 0
-  let calendarState: 'graphql' | 'rest-fallback' = 'rest-fallback'
-  let graphqlError: string | undefined
-
-  if (hasToken) {
-    try {
-      const collection = await getContributionsCollection(username, startDate, endDate)
-      calendarDays = buildHeatmapDays(
-        collection.contributionCalendar.weeks.flatMap((w) => w.contributionDays),
-        startDate,
-        endDate,
-      )
-      calendarTotal = collection.contributionCalendar.totalContributions
-      calendarState = 'graphql'
-    } catch (err) {
-      // 降级到 REST 提交近似，并记录原因供用户排查
-      graphqlError = err instanceof Error ? err.message : '贡献日历获取失败'
-      console.warn(`[gyr] GraphQL 贡献日历不可用，降级为提交近似：${graphqlError}`)
+  // 仓库 → 年度提交数（排序口径：GraphQL 精确值 / REST 归因近似值）
+  const yearlyCommitsMap = new Map<string, number>()
+  if (useGraphql && collection) {
+    for (const r of collection.commitsByRepo) yearlyCommitsMap.set(r.fullName, r.count)
+  } else {
+    for (const [fullName, commits] of attributedCommits) {
+      yearlyCommitsMap.set(fullName, commits.length)
     }
   }
 
-  const useGraphql = calendarState === 'graphql'
+  // 匿名降级日历：以归因提交日期为贡献日（口径：仅提交贡献，不含 PR/Issue 等）
   if (!useGraphql) {
-    // 匿名降级：以归因提交日期为贡献日（口径：仅提交贡献，不含 PR/Issue 等）
     const dates = Array.from(attributedCommitDates).sort()
     const maxCount = Math.max(1, ...dates.map((d) => countForDate(d)))
     calendarDays = dates.map((date) => {
@@ -308,10 +343,28 @@ export async function loadYearlyReport(
     : { stats: [] as typeof languageAgg.stats, repoCount: 0, totalBytes: 0, isComplete: false }
 
   /* ---------- 5. 年度 PR / Issue / Review / 评论（Search API） ---------- */
-  const prStats = await searchPullRequestStats(username, startDate, endDate)
-  const issueStats = await searchIssueStats(username, startDate, endDate)
-  const reviewedCount = await searchReviewedPrCount(username, startDate, endDate)
-  const commenterCount = await searchCommenterCount(username, startDate, endDate)
+  // Search API 匿名限流仅 10 次/分钟，失败时保留其余数据并把对应指标标为 error
+  const [prResult, issueResult, reviewResult, commentResult] = await Promise.all([
+    settle(searchPullRequestStats(username, startDate, endDate)),
+    settle(searchIssueStats(username, startDate, endDate)),
+    settle(searchReviewedPrCount(username, startDate, endDate)),
+    settle(searchCommenterCount(username, startDate, endDate)),
+  ])
+  const prStats = prResult.ok ? prResult.value : null
+  const issueStats = issueResult.ok ? issueResult.value : null
+  const reviewedCount = reviewResult.ok ? reviewResult.value : null
+  const commenterCount = commentResult.ok ? commentResult.value : null
+  const searchFailureNote = 'GitHub Search API 请求失败，该指标暂不可用'
+
+  // 已合并 PR 平均合并时长（有已合并 PR 时才有意义；失败不阻塞报告）
+  let mergeDuration: { total: number; sampled: number; avgDays: number | null } | null = null
+  if (prStats && prStats.merged > 0) {
+    try {
+      mergeDuration = await searchMergedPrDurations(username, startDate, endDate)
+    } catch (err) {
+      console.warn(`[gyr] PR 合并时长获取失败：${err instanceof Error ? err.message : err}`)
+    }
+  }
 
   /* ---------- 6. Gists ---------- */
   let gistCount = 0
@@ -324,27 +377,29 @@ export async function loadYearlyReport(
   /* ---------- 7. 指标组装 ---------- */
   const activeDates = calendarDays.filter((d) => d.contributionCount > 0).map((d) => d.date)
   const streak = longestStreak(activeDates)
-  const activeRepos = new Set<string>()
-  for (const [fullName, commits] of attributedCommits) {
-    if (commits.some((c) => c.date.slice(0, 10) >= startDate && c.date.slice(0, 10) <= endDate)) {
-      activeRepos.add(fullName)
-    }
-  }
+  // 年度内有可归因提交的仓库（GraphQL 精确口径，含参与协作的他人仓库）
+  const activeRepoNames = new Set(yearlyCommitsMap.keys())
+  // 占比分子限定为本人公开仓库，保证比值 ≤ 100%
+  const ownActiveRepos = nonForkRepos.filter((r) => yearlyCommitsMap.has(r.fullName)).length
 
   const contributionDaysCount = activeDates.length
-  const totalCommits = calendarDays.reduce((acc, d) => acc + d.contributionCount, 0)
+  // 总提交 = 纯提交口径（GraphQL totalCommitContributions / REST 归因提交数），
+  // 与热力图的"全部贡献"（含 PR/Issue/Review）分开统计
+  const totalCommitCount = useGraphql && collection
+    ? collection.totalCommitContributions
+    : totalCommitsAttributed
 
   const completedMonths = monthlyTrend(calendarDays, endDate).filter((m) => m.isComplete)
   const avgMonthlyCommits =
-    completedMonths.length > 0 ? totalCommits / completedMonths.length : 0
+    completedMonths.length > 0 ? totalCommitCount / completedMonths.length : 0
 
   const metrics: MetricCards = {
     totalCommits: {
-      status: calendarDays.length > 0 ? (useGraphql ? 'complete' : 'partial') : 'empty',
-      value: totalCommits,
+      status: useGraphql ? 'complete' : calendarDays.length > 0 ? 'partial' : 'empty',
+      value: totalCommitCount,
       note: useGraphql
-        ? '来自 GitHub 贡献统计（Commit Contributions）'
-        : `无 Token 降级：基于最近 ${queryRepos.length} 个公开仓库的提交记录按作者归因统计，非完整贡献口径`,
+        ? '来自 GitHub 贡献统计（Commit Contributions，仅计提交，不含 PR/Issue/Review）'
+        : `未登录降级：基于最近 ${queryRepos.length} 个公开仓库的提交记录按作者归因统计，非完整贡献口径`,
       source: useGraphql ? 'GitHub GraphQL' : 'GitHub REST /repos/*/commits',
     },
     newRepositories: {
@@ -375,37 +430,39 @@ export async function loadYearlyReport(
         : `降级口径：有提交记录的日期数（仅覆盖 ${queryRepos.length} 个仓库）`,
       source: useGraphql ? 'GitHub GraphQL contributionCalendar' : 'REST commits 近似',
     },
-    pullRequests: {
-      status: 'complete',
-      value: prStats.total,
-      note: `创建 ${prStats.total} / 合并 ${prStats.merged} / 关闭未合并 ${prStats.closedUnmerged} / 开放 ${prStats.open}（author 口径）`,
-      source: 'GitHub Search API',
-    },
-    issues: {
-      status: 'complete',
-      value: issueStats.total,
-      note: `创建 ${issueStats.total} / 已关闭 ${issueStats.closed} / 当前开放 ${issueStats.open}（author 口径）`,
-      source: 'GitHub Search API',
-    },
-    reviews: {
-      status: reviewedCount > 0 ? 'partial' : 'complete',
-      value: reviewedCount,
-      note: '按 reviewed-by 近似统计参与评审的 PR 数，不等于 Review 次数',
-      source: 'GitHub Search API',
-    },
+    pullRequests: prStats
+      ? {
+          status: 'complete',
+          value: prStats.total,
+          note: `创建 ${prStats.total} / 合并 ${prStats.merged} / 关闭未合并 ${prStats.closedUnmerged} / 开放 ${prStats.open}（author 口径）`,
+          source: 'GitHub Search API',
+        }
+      : error<number>(searchFailureNote),
+    issues: issueStats
+      ? {
+          status: 'complete',
+          value: issueStats.total,
+          note: `创建 ${issueStats.total} / 已关闭 ${issueStats.closed} / 当前开放 ${issueStats.open}（author 口径）`,
+          source: 'GitHub Search API',
+        }
+      : error<number>(searchFailureNote),
+    reviews: reviewedCount === null
+      ? error<number>(searchFailureNote)
+      : {
+          status: 'partial',
+          value: reviewedCount,
+          note: '按 reviewed-by 近似统计参与评审的 PR 数，不等于 Review 次数',
+          source: 'GitHub Search API',
+        },
   }
 
   /* ---------- 8. 仓库排行 ---------- */
-  const yearlyCommitsMap = new Map<string, number>()
-  for (const [fullName, commits] of attributedCommits) {
-    yearlyCommitsMap.set(fullName, commits.length)
-  }
   const ranking = rankRepositories(nonForkRepos, yearlyCommitsMap, 5)
 
   /* ---------- 9. 活跃度面板 ---------- */
   const activity: ActivityPanelData = {
     longestStreak: streak
-      ? complete(streak, useGraphql ? '来自贡献日历' : '来自提交记录近似')
+      ? complete(streak, useGraphql ? '来自贡献日历（含提交/PR/Issue/Review 贡献）' : '来自提交记录近似')
       : empty('年度内无连续贡献记录'),
     firstContribution:
       activeDates.length > 0
@@ -418,31 +475,51 @@ export async function loadYearlyReport(
     activeDays: {
       status: calendarDays.length > 0 ? (useGraphql ? 'complete' : 'partial') : 'empty',
       value: contributionDaysCount,
+      note: useGraphql ? '至少存在一项贡献的日期数' : '有提交记录的日期数（近似）',
     },
     activeRepos: {
-      status: activeRepos.size > 0 || nonForkRepos.length === 0 ? 'complete' : 'partial',
-      value: activeRepos.size,
+      status: activeRepoNames.size > 0 || nonForkRepos.length === 0 ? 'complete' : 'partial',
+      value: activeRepoNames.size,
       note: useGraphql
-        ? '年度内有归因提交记录的仓库数'
+        ? '年度内有可归因提交的仓库数（含参与协作的他人仓库）'
         : `降级口径：最近 ${queryRepos.length} 个仓库中有年度提交的仓库数`,
     },
     activeRepoRatio: {
       status: nonForkRepos.length > 0 ? 'complete' : 'empty',
-      value: nonForkRepos.length > 0 ? (activeRepos.size / nonForkRepos.length) * 100 : null,
-      note: `分母为当前可访问的公开仓库数（${nonForkRepos.length}）`,
+      value: nonForkRepos.length > 0 ? (ownActiveRepos / nonForkRepos.length) * 100 : null,
+      note: `分子为本人公开仓库中年度有提交的（${ownActiveRepos}），分母为当前可访问的公开仓库数（${nonForkRepos.length}）`,
     },
     avgMonthlyCommits: {
       status: completedMonths.length > 0 ? 'complete' : 'empty',
       value: avgMonthlyCommits,
-      note: `已完成月份数：${completedMonths.length}`,
+      note: `口径：年度提交数 ÷ 已完成月份数（${completedMonths.length}）`,
     },
-    prMerged: { status: 'complete', value: prStats.merged },
-    avgPrMergeDays: unsupported('需要遍历已合并 PR 的创建/合并时间，第一版暂不统计'),
-    issueCloseRate: {
-      status: issueStats.total > 0 ? 'complete' : 'empty',
-      value: issueStats.total > 0 ? (issueStats.closed / issueStats.total) * 100 : null,
-      note: `范围：年度创建的 ${issueStats.total} 个 Issue 中当前已关闭的比例`,
-    },
+    prMerged: prStats
+      ? { status: 'complete', value: prStats.merged }
+      : error<number>(searchFailureNote),
+    avgPrMergeDays: !prStats
+      ? error<number>(searchFailureNote)
+      : !mergeDuration || mergeDuration.avgDays === null
+        ? prStats.merged === 0
+          ? empty<number>('年度内无已合并 PR')
+          : unsupported<number>('已合并 PR 明细获取失败，暂无法计算')
+        : {
+            status: mergeDuration.total > mergeDuration.sampled ? 'partial' : 'complete',
+            value: mergeDuration.avgDays,
+            note:
+              mergeDuration.total > mergeDuration.sampled
+                ? `口径：创建 → 合并时间差均值（抽样最近 ${mergeDuration.sampled} 条 / 共 ${mergeDuration.total} 条）`
+                : `口径：${mergeDuration.sampled} 个已合并 PR 的创建 → 合并时间差均值`,
+          },
+    issueCloseRate: !issueStats
+      ? error<number>(searchFailureNote)
+      : issueStats.total > 0
+        ? {
+            status: 'complete',
+            value: (issueStats.closed / issueStats.total) * 100,
+            note: `范围：年度创建的 ${issueStats.total} 个 Issue 中当前已关闭的比例`,
+          }
+        : empty<number>('年度内未创建 Issue'),
   }
 
   /* ---------- 10. 其他统计 ---------- */
@@ -461,14 +538,22 @@ export async function loadYearlyReport(
       value: reposCreatedInYear(repos, startDate, endDate).length,
     },
     gists: { status: 'complete', value: gistCount, source: 'GET /users/{user}/gists' },
-    yearlyPRs: { status: 'complete', value: prStats.total },
-    yearlyIssues: { status: 'complete', value: issueStats.total },
-    yearlyReviews: { status: 'partial', value: reviewedCount, note: 'reviewed-by 近似口径' },
-    comments: {
-      status: 'partial',
-      value: commenterCount,
-      note: '发表过评论的议题/PR 数量（近似，不等于评论条数）',
-    },
+    yearlyPRs: prStats
+      ? { status: 'complete', value: prStats.total }
+      : error<number>(searchFailureNote),
+    yearlyIssues: issueStats
+      ? { status: 'complete', value: issueStats.total }
+      : error<number>(searchFailureNote),
+    yearlyReviews: reviewedCount === null
+      ? error<number>(searchFailureNote)
+      : { status: 'partial', value: reviewedCount, note: 'reviewed-by 近似口径' },
+    comments: commenterCount === null
+      ? error<number>(searchFailureNote)
+      : {
+          status: 'partial',
+          value: commenterCount,
+          note: '发表过评论的议题/PR 数量（近似，不等于评论条数）',
+        },
     primaryLanguage: {
       status: languagesState.stats.length > 0 ? 'complete' : 'empty',
       value: primaryLanguage(languagesState.stats),

@@ -37,15 +37,22 @@ query($login: String!, $from: DateTime!, $to: DateTime!) {
           }
         }
       }
+      commitContributionsByRepository(maxRepositories: 100) {
+        repository {
+          name
+          owner {
+            login
+          }
+        }
+        contributions {
+          totalCount
+        }
+      }
     }
   }
 }
 `
 
-/** 检查是否配置了 Token */
-export function hasGithubToken(): boolean {
-  return getGithubToken() !== null
-}
 
 /** GraphQL 响应结构 */
 interface GraphQlResponse<T> {
@@ -70,7 +77,7 @@ export async function getContributionsCollection(
   if (!token) {
     throw new GithubApiError(
       'forbidden',
-      '贡献日历需要 GitHub Token 认证：GraphQL API 必须携带个人访问令牌。可在报告页右上角配置 Token 后重试。',
+      '贡献日历需要 GitHub 登录：GraphQL API 必须携带授权令牌。请点击右上角「使用 GitHub 登录」后重试。',
       null,
       GRAPHQL_URL,
     )
@@ -103,7 +110,7 @@ export async function getContributionsCollection(
     if (resp.status === 401 || resp.status === 403) {
       throw new GithubApiError(
         'forbidden',
-        'GitHub Token 无效或权限不足，请检查 Token 是否有效（需要 user 或 public 读取权限）',
+        'GitHub 授权无效或已过期，请退出后重新登录',
         resp.status,
         GRAPHQL_URL,
       )
@@ -144,6 +151,8 @@ function mapCollection(
   const calendar =
     (raw.contributionCalendar as Record<string, unknown>) ?? {}
   const weeks = (calendar.weeks as Array<Record<string, unknown>>) ?? []
+  const byRepo =
+    (raw.commitContributionsByRepository as Array<Record<string, unknown>>) ?? []
 
   return {
     totalCommitContributions: Number(raw.totalCommitContributions ?? 0),
@@ -157,6 +166,17 @@ function mapCollection(
     totalRepositoryContributions: Number(
       raw.totalRepositoryContributions ?? 0,
     ),
+    commitsByRepo: byRepo
+      .map((entry) => {
+        const repo = (entry.repository as Record<string, unknown>) ?? {}
+        const owner = (repo.owner as Record<string, unknown>) ?? {}
+        const contributions = (entry.contributions as Record<string, unknown>) ?? {}
+        return {
+          fullName: `${String(owner.login ?? '')}/${String(repo.name ?? '')}`,
+          count: Number(contributions.totalCount ?? 0),
+        }
+      })
+      .filter((r) => !r.fullName.startsWith('/') && r.count > 0),
     contributionCalendar: {
       totalContributions: Number(calendar.totalContributions ?? 0),
       weeks: weeks.map((week) => ({

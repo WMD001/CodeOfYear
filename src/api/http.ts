@@ -1,6 +1,7 @@
 /**
  * GitHub API 基础请求层
- * - 可选 Token（localStorage 中的个人访问令牌，仅匿名模式不可用 GraphQL 时由用户填写）
+ * - 可选 Token：来自 OAuth 登录（见 api/auth/github.js + src/api/oauth.ts），
+ *   仅存浏览器 localStorage，匿名请求自动降级
  * - 指数退避重试（429 / 5xx）
  * - 错误归一化
  */
@@ -30,6 +31,11 @@ export function setGithubToken(token: string | null): void {
   } catch {
     /* noop */
   }
+}
+
+/** 是否已通过 OAuth 登录（存在 Token） */
+export function hasGithubToken(): boolean {
+  return getGithubToken() !== null
 }
 
 interface RequestOptions {

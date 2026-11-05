@@ -47,7 +47,7 @@ export function consistencyCheck(
   }
 }
 
-/** 月度提交趋势：1-12 月，未来月份 commits 为 null（未统计） */
+/** 月度贡献趋势：1-12 月，未来月份 commits 为 null（未统计） */
 export function monthlyTrend(
   days: HeatmapDay[],
   endDate: string,

@@ -68,6 +68,7 @@ vi.mock('../../src/api/github-rest', () => ({
   searchIssueStats: vi.fn(async () => ({ total: 3, open: 1, closed: 2 })),
   searchReviewedPrCount: vi.fn(async () => 2),
   searchCommenterCount: vi.fn(async () => 5),
+  searchMergedPrDurations: vi.fn(async () => ({ total: 4, sampled: 4, avgDays: 2.5 })),
   getGists: vi.fn(async () => [{ id: '1', description: null, htmlUrl: '', createdAt: '', updatedAt: '' }]),
 }))
 
@@ -108,9 +109,9 @@ describe('report-service 报告组装', () => {
     expect(report.heatmap.days).toHaveLength(3)
     const jan = report.monthlyTrend[0]
     expect(jan.commits).toBe(2) // 1月：01-05 两条
-    const nov = report.monthlyTrend[10]
-    expect(nov.commits).toBeNull() // 11月未来未统计
-    expect(nov.isComplete).toBe(false)
+    // 未来月份（若当前已到 12 月则可能不存在）必须为 null，不能填充虚构零值
+    const futureMonths = report.monthlyTrend.filter((m) => !m.isComplete)
+    expect(futureMonths.every((m) => m.commits === null)).toBe(true)
 
     // 仓库排行：按年度提交数（app 3 > lib 1）
     expect(report.topRepositories.sortedByCommits).toBe(true)
@@ -130,6 +131,33 @@ describe('report-service 报告组装', () => {
     // 其他统计
     expect(report.extra.currentPublicRepos).toBe(2)
     expect(report.extra.gists.value).toBe(1)
+  })
+
+  it('Search API 失败时仍生成报告，相关指标标记为 error', async () => {
+    const rest = await import('../../src/api/github-rest')
+    const prMock = vi.mocked(rest.searchPullRequestStats)
+    const original = prMock.getMockImplementation()
+    // loadLastYearStats 也会调用 PR 搜索，因此需要让所有调用都失败
+    prMock.mockRejectedValue(new Error('rate limit'))
+
+    try {
+      const report = await loadYearlyReport('octocat', 2026)
+
+      // 其他数据不受影响
+      expect(report.header.username).toBe('octocat')
+      expect(report.metrics.totalCommits.value).toBe(4)
+      expect(report.metrics.issues.status).toBe('complete')
+
+      // 失败项不能伪装成 0，必须标记 error 且 value 为 null
+      expect(report.metrics.pullRequests.status).toBe('error')
+      expect(report.metrics.pullRequests.value).toBeNull()
+      expect(report.activity.prMerged.status).toBe('error')
+      expect(report.activity.avgPrMergeDays.status).toBe('error')
+      expect(report.extra.yearlyPRs.status).toBe('error')
+    } finally {
+      if (original) prMock.mockImplementation(original)
+      else prMock.mockReset()
+    }
   })
 
   it('不存在用户时抛出 not_found 错误', async () => {

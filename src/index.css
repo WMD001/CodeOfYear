@@ -6,15 +6,15 @@
    ============================================================ */
 @theme {
   /* 背景层级 */
-  --color-bg-base: #0d1117;      /* 页面背景（深蓝黑） */
-  --color-bg-card: #161b22;      /* 卡片背景 */
-  --color-bg-elev: #1c2128;      /* 悬浮/次级容器 */
-  --color-bg-inset: #0d1117;     /* 图表内嵌背景 */
+  --color-bg-base: #0b1120;      /* 页面背景（深蓝黑） */
+  --color-bg-card: #131a26;      /* 卡片背景 */
+  --color-bg-elev: #1a2332;      /* 悬浮/次级容器 */
+  --color-bg-inset: #0d141d;     /* 图表内嵌背景 */
 
   /* 边框与分割线 */
-  --color-border-subtle: #21262d;
-  --color-border-default: #30363d;
-  --color-border-strong: #3d444d;
+  --color-border-subtle: #1a222d;
+  --color-border-default: #232e3c;
+  --color-border-strong: #334052;
 
   /* GitHub 绿主色系 */
   --color-gh-green: #2ea043;
@@ -35,7 +35,7 @@
   --color-text-inverse: #0d1117;
 
   /* 热力图绿阶（贡献少 → 贡献多） */
-  --color-heat-0: #161b22;
+  --color-heat-0: #182029;
   --color-heat-1: #0e4429;
   --color-heat-2: #006d32;
   --color-heat-3: #26a641;
@@ -50,6 +50,9 @@
     Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
     "Liberation Mono", monospace;
+  /* 设计图标题/数字使用窄体几何字体，优先 Windows 自带的 Bahnschrift */
+  --font-display: "Bahnschrift", "DIN Alternate", "DIN Condensed",
+    "Roboto Condensed", "Arial Narrow", var(--font-sans);
 }
 
 /* ============================================================
@@ -66,6 +69,14 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 页面底纹：左上绿光 + 右上蓝光，贴近设计图的深色科技氛围 */
+.page-glow {
+  background-image:
+    radial-gradient(900px 480px at 12% -8%, rgba(46, 160, 67, 0.16), transparent 62%),
+    radial-gradient(1000px 520px at 92% -12%, rgba(56, 139, 253, 0.13), transparent 58%);
+  background-repeat: no-repeat;
 }
 
 /* 统一滚动条（深色） */
@@ -89,10 +100,25 @@ body {
   background-color: var(--color-bg-card);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-card);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
 /* 等宽数字，用于数据展示 */
 .mono-num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* 设计图同款窄体标题与数字 */
+.display {
+  font-family: var(--font-display);
+  font-stretch: 92%;
+  letter-spacing: 0.01em;
+}
+
+.display-num {
+  font-family: var(--font-display);
+  font-stretch: 90%;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }

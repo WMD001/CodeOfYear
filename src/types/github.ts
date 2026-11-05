@@ -68,6 +68,14 @@ export interface GithubContributionCalendar {
   weeks: GithubContributionWeek[]
 }
 
+/** 仓库级年度提交（contributionsCollection.commitContributionsByRepository） */
+export interface GithubRepoCommitContributions {
+  /** 仓库全名 owner/name */
+  fullName: string
+  /** 年度内可归因的提交数（精确口径） */
+  count: number
+}
+
 /** 贡献集合（contributionsCollection） */
 export interface GithubContributionsCollection {
   totalCommitContributions: number
@@ -76,6 +84,8 @@ export interface GithubContributionsCollection {
   totalPullRequestReviewContributions: number
   totalRepositoryContributions: number
   contributionCalendar: GithubContributionCalendar
+  /** 各仓库年度提交数（commitContributionsByRepository，最多 100 个仓库） */
+  commitsByRepo: GithubRepoCommitContributions[]
   // 其他可选统计
   totalPullRequestsOpened?: number
   totalPullRequestsMerged?: number

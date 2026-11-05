@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import TokenSetting from '../components/TokenSetting'
-import { hasGithubToken } from '../api/github-graphql'
+import { hasGithubToken, setGithubToken } from '../api/http'
+import { openGithubLogin } from '../api/oauth'
+import DevTokenDialog from '../components/DevTokenDialog'
 
 /** GitHub 用户名规则：字母/数字/连字符，不以连字符开头或结尾，长度 1-39 */
 const USERNAME_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/
@@ -15,8 +16,8 @@ function HomePage() {
   const [username, setUsername] = useState('')
   const [year, setYear] = useState(CURRENT_YEAR)
   const [error, setError] = useState<string | null>(null)
-  const [tokenOpen, setTokenOpen] = useState(false)
-  const tokenConfigured = hasGithubToken()
+  // hasGithubToken 只在挂载时读取一次；登录跳转回本页时会重新挂载
+  const [loggedIn, setLoggedIn] = useState(() => hasGithubToken())
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -38,14 +39,35 @@ function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 bg-gradient-to-b from-[#0d1117] via-[#0d1117] to-[#10151c] relative">
-      {/* 右上角 Token 配置入口 */}
-      <button
-        type="button"
-        onClick={() => setTokenOpen(true)}
-        className="absolute top-4 right-4 text-xs border border-[#30363d] hover:border-[#3d444d] text-[#8b949e] hover:text-[#e6edf3] rounded-lg px-3 py-1.5 transition"
-      >
-        {tokenConfigured ? '已配置 Token' : '配置 Token（可选）'}
-      </button>
+      {/* 右上角入口：开发态 Token 弹窗 + GitHub 登录 */}
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        {import.meta.env.DEV && (
+          <DevTokenDialog onSaved={() => setLoggedIn(hasGithubToken())} />
+        )}
+        {loggedIn ? (
+          <button
+            type="button"
+            onClick={() => {
+              setGithubToken(null)
+              setLoggedIn(false)
+            }}
+            className="text-xs border border-[#30363d] hover:border-[#3d444d] text-[#8b949e] hover:text-[#e6edf3] rounded-lg px-3 py-1.5 transition"
+          >
+            退出登录
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => openGithubLogin(() => navigate(0))}
+            className="inline-flex items-center gap-1.5 text-xs bg-[#238636] hover:bg-[#2ea043] text-white rounded-lg px-3 py-1.5 transition"
+          >
+            <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true">
+              <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.04-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.27-.82 2.15 0 3.07 1.87 3.75 3.65 3.95-.29.25-.55.73-.64 1.37-.57.26-2 .69-2.88-.82-.52-.88-1.44-.99-1.44-.99-.58.01-1.18.44-.46.86.82.38 1.26 1.5 1.26 1.5.73 2.06 3.71 1.39 3.71 1.39.01 1.23.01 2.02.01 2.33 0 .21-.15.46-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z" />
+            </svg>
+            使用 GitHub 登录
+          </button>
+        )}
+      </div>
       {/* GitHub 标识 */}
       <div className="mb-6">
         <svg
@@ -146,22 +168,20 @@ function HomePage() {
           数据来源：GitHub 公开 API（REST & GraphQL）· 所有统计基于实际获取的数据
           · 当前年份统计截止于今日，不展示未来贡献
         </p>
-        <button
-          type="button"
-          onClick={() => setTokenOpen(true)}
-          className="mt-4 text-xs text-[#8b949e] hover:text-[#e6edf3] underline underline-offset-4 transition"
-        >
-          {tokenConfigured
-            ? '已配置 Token（点击修改）'
-            : '配置 Token（可选，提升 API 请求额度）'}
-        </button>
+        {!loggedIn && (
+          <p className="mt-4 text-xs text-[#6e7681]">
+            未登录时以匿名额度访问（部分统计降级），{' '}
+            <button
+              type="button"
+              onClick={() => openGithubLogin(() => navigate(0))}
+              className="text-[#3fb950] hover:underline underline-offset-4 bg-transparent cursor-pointer"
+            >
+              使用 GitHub 登录
+            </button>{' '}
+            可解锁完整贡献日历与更准确的统计。
+          </p>
+        )}
       </div>
-
-      <TokenSetting
-        open={tokenOpen}
-        onClose={() => setTokenOpen(false)}
-        onSaved={() => setTokenOpen(false)}
-      />
     </div>
   )
 }

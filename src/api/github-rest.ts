@@ -229,7 +229,7 @@ export async function getGists(username: string): Promise<GithubGist[]> {
    ============================================================ */
 
 interface SearchResult {
-  totalCount: number
+  total_count: number
 }
 
 /**
@@ -239,12 +239,13 @@ interface SearchResult {
 async function searchCount(query: string): Promise<number> {
   const key = `search:${query}`
   const cached = cacheGet<number>(key)
-  if (cached) return cached
+  // 0 是合法结果（确实没有匹配项），不能用 truthy 判断，否则会反复请求并浪费额度
+  if (cached !== null) return cached
 
   const raw = await githubRequest<SearchResult>(
     `/search/issues?q=${encodeURIComponent(query)}&per_page=1`,
   )
-  const total = Number(raw.totalCount ?? 0)
+  const total = Number(raw.total_count ?? 0)
   cacheSet(key, total, 10 * 60 * 1000)
   return total
 }
@@ -304,4 +305,48 @@ export async function searchCommenterCount(
   to: string,
 ): Promise<number> {
   return searchCount(`commenter:${username} created:${from}..${to}`)
+}
+
+/**
+ * 已合并 PR 的平均合并时长（创建 → 合并，天）。
+ * 拉取最近创建的 100 条明细计算；超过 100 条时为抽样口径，
+ * 调用方据 total > sampled 标记"部分"。
+ */
+export async function searchMergedPrDurations(
+  username: string,
+  from: string,
+  to: string,
+): Promise<{ total: number; sampled: number; avgDays: number | null }> {
+  const base = `author:${username} type:pr is:merged created:${from}..${to}`
+  const key = `search-pr-durations:${base}`
+  const cached = cacheGet<{ total: number; sampled: number; avgDays: number | null }>(key)
+  if (cached) return cached
+
+  const raw = await githubRequest<{
+    total_count: number
+    items?: Array<Record<string, unknown>>
+  }>(
+    `/search/issues?q=${encodeURIComponent(base)}&per_page=100&sort=created&order=desc`,
+  )
+
+  const items = raw.items ?? []
+  let sum = 0
+  let n = 0
+  for (const item of items) {
+    const created = String(item.created_at ?? '')
+    const closed = String(item.closed_at ?? '')
+    if (!created || !closed) continue
+    const days = (Date.parse(closed) - Date.parse(created)) / 86_400_000
+    if (Number.isFinite(days) && days >= 0) {
+      sum += days
+      n++
+    }
+  }
+  const result = {
+    total: Number(raw.total_count ?? 0),
+    sampled: n,
+    avgDays: n > 0 ? sum / n : null,
+  }
+  cacheSet(key, result, 10 * 60 * 1000)
+  return result
 }
