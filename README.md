@@ -33,7 +33,7 @@ React 19 · TypeScript · Vite · Tailwind CSS · Apache ECharts · react-router
 
 | 场景 | 凭据 | 数据范围 |
 |---|---|---|
-| 未登录 | 无 | 公开数据（REST + Search，部分指标为近似） |
+| 未登录 | 无；配置 `GITHUB_PAT_TOKEN` 后走服务端代理 | 公开数据；配置代理 PAT 后可用完整公开贡献日历 |
 | 登录后查本人 | OAuth App（`repo` scope） | 本人公开 + 私有仓库 / 私有贡献 |
 | 登录后查他人 | OAuth App（仍用 token 提高额度） | **强制公开数据**，Search 加 `is:public` |
 
@@ -42,8 +42,18 @@ React 19 · TypeScript · Vite · Tailwind CSS · Apache ECharts · react-router
 - 报告包含私有仓库时，页面会显示隐私提示；导出的 PNG 会包含私有仓库名称。
 - 本地开发如果没有 OAuth 服务，可使用首页右上角的「开发 Token」弹窗（仅 `import.meta.env.DEV` 显示，生产构建不包含）。
 
+### 未登录公开数据代理
+
+未登录访客不能直接持有 PAT，因此生产环境的前端请求会走 `/api/github` 代理，由 Vercel Function 在服务端附加 `GITHUB_PAT_TOKEN`。
+
+- 代理只允许 `/users/*`、`/repos/*`、`/search/*`、`/graphql`，不转发 `/user`、`/gists`、`/notifications` 等认证用户专属路径。
+- `GITHUB_PAT_TOKEN` 必须是**空 scope 的 classic PAT**，或**仅公开仓库只读的 fine-grained PAT**。
+- **不要**使用带 `repo` scope 的 Token：否则匿名访客可能通过 `/repos/*` 读到该 Token 所有者可访问的私有仓库数据。
+- 未配置 `GITHUB_PAT_TOKEN` 时，代理自动回退为匿名请求，额度恢复 60 次/小时。
+- 本地 `npm run dev` 不包含 `/api` Functions，未登录仍直连匿名接口；本地验证完整数据用「开发 Token」。
+
 > 匿名模式下 GitHub API 限流约 60 次/小时（Search API 10 次/分钟）；
-> 登录后 REST 5000 次/小时、Search 30 次/分钟。语言/提交统计按需限量查询并缓存，超出部分标记为"部分统计"。
+> 配置 `GITHUB_PAT_TOKEN` 或登录后 REST 5000 次/小时、Search 30 次/分钟。语言/提交统计按需限量查询并缓存，超出部分标记为"部分统计"。
 
 ## 本地开发
 
@@ -55,7 +65,7 @@ npm run build      # 生产构建（输出 dist/）
 npm run preview    # 预览构建产物
 ```
 
-需要本地验证 OAuth 登录时使用 `vercel dev`，并配置 `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET`。
+需要本地验证 OAuth 登录时使用 `npx vercel dev --listen 3001`，并配置 `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET`。使用 3001 是因为本机 3000 被 IDE 占用；OAuth App 回调需临时改为 `http://localhost:3001/api/auth/github/callback`。
 
 ## 部署（Vercel）
 
@@ -69,7 +79,8 @@ npm run preview    # 预览构建产物
    - 环境变量（Vercel Project Settings）：
      - `GITHUB_OAUTH_CLIENT_ID`
      - `GITHUB_OAUTH_CLIENT_SECRET`
-5. SPA 路由回退（Vercel 已内置）：直接打开/刷新报告 URL 不会 404
+     - `GITHUB_PAT_TOKEN`（可选，未登录公开数据代理；必须公开只读）
+5. SPA 路由回退由项目根目录的 `vercel.json` 处理：`/report/*` 会回退到 `index.html`
 
 ## 项目结构
 

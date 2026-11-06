@@ -2,12 +2,11 @@
  * GitHub GraphQL API 封装
  * 用于获取贡献日历与贡献分类统计。
  *
- * ⚠️ 注意：GitHub GraphQL API 必须携带认证 Token。
- * - 有 Token：返回完整贡献日历与分类贡献。
- * - 无 Token：抛出 forbidden 错误，由 report-service 捕获并降级
- *   （匿名模式改用 REST commits 近似统计）。
+ * - 登录用户：直连 GitHub GraphQL，携带用户 token。
+ * - 未登录生产环境：走 /api/github/graphql 代理，由服务端附加 GITHUB_PAT_TOKEN。
+ * - 本地未登录：没有代理，抛出 forbidden，由 report-service 降级为 REST 近似。
  */
-import { getGithubToken } from './http'
+import { getGithubToken, usesGithubProxy } from './http'
 import { GithubApiError } from './github-errors'
 import { cacheGet, cacheSet, CACHE_TTL } from '../utils/cache'
 import type {
@@ -16,6 +15,7 @@ import type {
 } from '../types/github'
 
 const GRAPHQL_URL = 'https://api.github.com/graphql'
+const GRAPHQL_PROXY_URL = '/api/github/graphql'
 
 const CALENDAR_QUERY = `
 query($login: String!, $from: DateTime!, $to: DateTime!) {
@@ -62,19 +62,21 @@ interface GraphQlResponse<T> {
 
 /**
  * 获取用户贡献集合（含贡献日历与年度分类总计）。
- * 无 Token 时抛出 forbidden 错误。
+ * cacheScope 用于隔离“本人含私有”和“公开数据”的缓存，避免串数据。
  */
 export async function getContributionsCollection(
   username: string,
   from: string, // YYYY-MM-DD
   to: string, // YYYY-MM-DD
+  cacheScope: 'self' | 'public' = 'public',
 ): Promise<GithubContributionsCollection> {
-  const key = `calendar:${username}:${from}:${to}`
+  const key = `calendar:${username}:${from}:${to}:${cacheScope}`
   const cached = cacheGet<GithubContributionsCollection>(key)
   if (cached) return cached
 
   const token = getGithubToken()
-  if (!token) {
+  const proxy = usesGithubProxy()
+  if (!token && !proxy) {
     throw new GithubApiError(
       'forbidden',
       '贡献日历需要 GitHub 登录：GraphQL API 必须携带授权令牌。请点击右上角「使用 GitHub 登录」后重试。',
@@ -83,12 +85,15 @@ export async function getContributionsCollection(
     )
   }
 
-  const resp = await fetch(GRAPHQL_URL, {
+  const endpoint = token ? GRAPHQL_URL : GRAPHQL_PROXY_URL
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const resp = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({
       query: CALENDAR_QUERY,
       // GitHub GraphQL 的 from/to 类型为 DateTime!，必须传完整 ISO 8601 时间戳；
@@ -112,14 +117,14 @@ export async function getContributionsCollection(
         'forbidden',
         'GitHub 授权无效或已过期，请退出后重新登录',
         resp.status,
-        GRAPHQL_URL,
+        endpoint,
       )
     }
     throw new GithubApiError(
       'server',
       `GraphQL 请求失败（${resp.status}）`,
       resp.status,
-      GRAPHQL_URL,
+      endpoint,
     )
   }
 
@@ -133,7 +138,7 @@ export async function getContributionsCollection(
           : 'unknown',
       msg ?? '贡献日历数据不可用',
       resp.status,
-      GRAPHQL_URL,
+      endpoint,
     )
   }
 

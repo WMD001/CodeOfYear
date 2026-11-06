@@ -24,7 +24,7 @@ import {
   searchPullRequestStats,
   searchReviewedPrCount,
 } from '../api/github-rest'
-import { fetchViewerLogin, getGithubLogin, hasGithubToken } from '../api/http'
+import { fetchViewerLogin, getGithubLogin, hasGithubToken, usesGithubProxy } from '../api/http'
 import { GithubApiError } from '../api/github-errors'
 import { complete, empty, error, unsupported } from '../types/data-status'
 import type {
@@ -128,6 +128,7 @@ async function loadLastYearStats(
   useGraphql: boolean,
   repos: GithubRepository[],
   publicOnly: boolean,
+  cacheScope: 'self' | 'public',
 ): Promise<LastYearSnapshot | undefined> {
   if (year <= 2009) return undefined // 无法获取 2008 年前的对比数据
   const lastYear = year - 1
@@ -160,7 +161,12 @@ async function loadLastYearStats(
   // 去年贡献日历（仅 GraphQL 可用时，同当年口径）
   if (useGraphql) {
     try {
-      const collection = await getContributionsCollection(username, from, to)
+      const collection = await getContributionsCollection(
+        username,
+        from,
+        to,
+        cacheScope,
+      )
       snapshot.totalCommits = collection.totalCommitContributions
       snapshot.contributionDays = collection.contributionCalendar.weeks
         .flatMap((w) => w.contributionDays)
@@ -188,6 +194,8 @@ export async function loadYearlyReport(
   const endDate = yearEndDate(year)
   const generatedAt = new Date().toISOString()
   const hasToken = hasGithubToken()
+  // 未登录的生产环境会走 /api/github 代理，由服务端附加应用级 PAT
+  const serverProxy = usesGithubProxy()
   // 只有“登录用户本人”才允许读取私有仓库；他人报告强制公开口径
   const viewerLogin = hasToken
     ? (getGithubLogin() ?? (await fetchViewerLogin()))
@@ -199,6 +207,7 @@ export async function loadYearlyReport(
   )
   const includePrivate = isSelf
   const publicOnly = !isSelf
+  const cacheScope: 'self' | 'public' = isSelf ? 'self' : 'public'
 
   /* ---------- 1. 用户资料（404 直接报错） ---------- */
   let profile
@@ -234,9 +243,14 @@ export async function loadYearlyReport(
   let graphqlError: string | undefined
   let collection: GithubContributionsCollection | undefined
 
-  if (hasToken) {
+  if (hasToken || serverProxy) {
     try {
-      collection = await getContributionsCollection(username, startDate, endDate)
+      collection = await getContributionsCollection(
+        username,
+        startDate,
+        endDate,
+        cacheScope,
+      )
       calendarDays = buildHeatmapDays(
         collection.contributionCalendar.weeks.flatMap((w) => w.contributionDays),
         startDate,
@@ -245,9 +259,11 @@ export async function loadYearlyReport(
       calendarTotal = collection.contributionCalendar.totalContributions
       useGraphql = true
     } catch (err) {
-      // 降级到 REST 提交近似，并记录原因供用户排查
-      graphqlError = err instanceof Error ? err.message : '贡献日历获取失败'
-      console.warn(`[gyr] GraphQL 贡献日历不可用，降级为提交近似：${graphqlError}`)
+      // 登录用户的失败需要提示；未登录代理失败则静默降级，避免对匿名访客报错
+      if (hasToken) {
+        graphqlError = err instanceof Error ? err.message : '贡献日历获取失败'
+        console.warn(`[gyr] GraphQL 贡献日历不可用，降级为提交近似：${graphqlError}`)
+      }
     }
   }
 
@@ -328,6 +344,7 @@ export async function loadYearlyReport(
     useGraphql,
     nonForkRepos,
     publicOnly,
+    cacheScope,
   )
 
   function countForDate(date: string): number {

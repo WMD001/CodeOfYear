@@ -95,6 +95,18 @@ export function hasGithubToken(): boolean {
   return getGithubToken() !== null
 }
 
+/**
+ * 未登录的生产环境：REST 请求走 /api/github 代理，
+ * 由服务端附加 GITHUB_PAT_TOKEN，避免 PAT 暴露到浏览器。
+ * 本地 npm run dev 没有 /api 目录，继续直连匿名接口。
+ */
+export function usesGithubProxy(): boolean {
+  return (
+    !hasGithubToken() &&
+    (import.meta.env.PROD || import.meta.env.VITE_GITHUB_PROXY === '1')
+  )
+}
+
 interface RequestOptions {
   method?: 'GET' | 'POST'
   body?: unknown
@@ -120,7 +132,13 @@ export async function githubRequest<T>(
 ): Promise<T> {
   const token = getGithubToken()
   const retries = options.retries ?? 2
-  const endpoint = API_BASE + path
+  // 登录用户直连 GitHub；未登录的生产环境走服务端代理，由代理附加应用级 PAT
+  const base = token
+    ? API_BASE
+    : import.meta.env.PROD
+      ? '/api/github'
+      : API_BASE
+  const endpoint = base + path
 
   let lastError: GithubApiError | null = null
 
