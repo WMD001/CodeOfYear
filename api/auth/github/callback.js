@@ -11,7 +11,7 @@
 
 const STATE_COOKIE = 'gyr_oauth_state'
 
-function renderPage(ok, title, detail, tokenLiteral = 'null') {
+function renderPage(ok, title, detail, tokenLiteral = 'null', loginLiteral = 'null') {
   const color = ok ? '#3fb950' : '#f85149'
   return `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -29,6 +29,7 @@ function renderPage(ok, title, detail, tokenLiteral = 'null') {
   var ok = ${ok ? 'true' : 'false'};
   if (ok) {
     try { localStorage.setItem('gyr_github_token', ${tokenLiteral}); } catch (e) {}
+    try { localStorage.setItem('gyr_github_login', ${loginLiteral}); } catch (e) {}
   }
   var notified = false;
   try {
@@ -51,11 +52,19 @@ function renderPage(ok, title, detail, tokenLiteral = 'null') {
 </script></body></html>`
 }
 
-function htmlResponse(res, status, ok, title, detail, token) {
-  // token 以 JSON 字面量安全嵌入脚本；失败路径传 null
+function htmlResponse(res, status, ok, title, detail, token, login) {
+  // token / login 以 JSON 字面量安全嵌入脚本；失败路径传 null
   res.statusCode = status
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
-  res.end(renderPage(ok, title, detail, token === undefined ? 'null' : JSON.stringify(token)))
+  res.end(
+    renderPage(
+      ok,
+      title,
+      detail,
+      token === undefined ? 'null' : JSON.stringify(token),
+      login === undefined ? 'null' : JSON.stringify(login),
+    ),
+  )
 }
 
 function readStateCookie(cookieHeader) {
@@ -108,7 +117,36 @@ export default async function handler(req, res) {
       htmlResponse(res, 200, false, '换取令牌失败', detail)
       return
     }
-    htmlResponse(res, 200, true, '登录成功', '完整贡献数据已解锁，正在返回报告页…', data.access_token)
+
+    // 记录 token 对应的登录用户，供前端判断“本人 / 他人”数据范围。
+    // 查询他人时 GitHub 本身只返回公开数据，前端还会强制 is:public。
+    let login = ''
+    try {
+      const userResp = await fetch('https://api.github.com/user', {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${data.access_token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (userResp.ok) {
+        const user = await userResp.json()
+        if (typeof user.login === 'string') login = user.login
+      }
+    } catch {
+      /* 获取 login 失败不阻塞登录，前端会按公开数据兜底 */
+    }
+
+    htmlResponse(
+      res,
+      200,
+      true,
+      '登录成功',
+      '完整贡献数据已解锁，正在返回报告页…',
+      data.access_token,
+      login,
+    )
   } catch (err) {
     htmlResponse(res, 200, false, '网络异常', `连接 GitHub 失败：${err instanceof Error ? err.message : '未知错误'}`)
   }

@@ -133,6 +133,16 @@ export default function WrappedSummary({
     <div className="min-h-screen page-glow">
       <div className="mx-auto max-w-[1180px] px-4 py-5 md:px-6">
         <div ref={cardRef}>
+          {report.includesPrivate && (
+            <div
+              className="mb-3 rounded-lg border border-[#d29922]/30 bg-[#d29922]/[0.07] px-3 py-2 text-[10px] leading-relaxed text-[#d29922]"
+              role="status"
+              data-export-ignore="true"
+            >
+              本摘要包含私有仓库信息，分享链接或导出图片会显示私有仓库名称，请确认后再分享。
+            </div>
+          )}
+
           {/* 顶部：用户名 + 总览说明 + 分享操作 */}
           <header className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div className="min-w-0">

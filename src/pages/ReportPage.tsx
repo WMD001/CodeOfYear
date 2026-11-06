@@ -147,12 +147,13 @@ function ReportPage() {
   }
 
   const report = state.report
+  const visibilityLabel = report.includesPrivate ? '含私有' : '公开'
   const modeLabel =
     report.dataMode === 'graphql'
-      ? '完整数据模式'
+      ? `完整数据模式（${visibilityLabel}）`
       : loggedIn
-        ? '降级数据模式'
-        : '匿名数据模式'
+        ? `降级数据模式（${visibilityLabel}）`
+        : '匿名数据模式（公开）'
   const modeTone = report.dataMode === 'graphql' ? 'complete' : 'partial'
   const displayName = report.user.displayName || report.header.username
   const streakDays = report.activity.longestStreak.value?.days
@@ -271,6 +272,17 @@ function ReportPage() {
             modeTone={report.dataMode === 'graphql' ? 'complete' : 'partial'}
             actions={headerActions}
           />
+
+          {/* 私有数据提示：分享/导出前必须让用户明确知道 */}
+          {report.includesPrivate && (
+            <div
+              className="mt-3 border border-[#d29922]/30 bg-[#d29922]/[0.07] rounded-lg px-4 py-2 text-[11px] text-[#d29922] leading-relaxed"
+              role="status"
+              data-export-ignore="true"
+            >
+              本报告包含私有仓库信息。分享链接或导出的 PNG 会显示私有仓库名称，请确认后再分享。
+            </div>
+          )}
 
           {/* GraphQL 降级（已登录但贡献日历获取失败）时的提示 */}
           {report.graphqlError && (

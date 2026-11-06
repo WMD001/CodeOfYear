@@ -1,8 +1,8 @@
 /**
  * OAuth 登录入口：GET /api/auth/github
  * 302 重定向到 GitHub 授权页。
- * - 不申请任何 scope：仅读取公开数据（公开贡献日历 / REST 公开接口），
- *   私有仓库贡献本就不在统计口径内。
+ * - 申请 repo scope：登录后可读取本人私有仓库与私有贡献；
+ *   查询他人时 GitHub 仍只返回公开数据，后端也会强制公开口径。
  * - state 写入 HttpOnly Cookie（10 分钟），回调端校验防 CSRF。
  * - 不传 redirect_uri：GitHub 回跳到 OAuth App 注册的回调地址，
  *   避免本地 / 预览域名与注册地址不一致的问题。
@@ -45,8 +45,9 @@ export default async function handler(req, res) {
   const params = new URLSearchParams({
     client_id: clientId,
     state,
-    // scope 留空：token 仅用于读取公开数据，符合最小权限原则
-    scope: '',
+    // repo scope：仅用于读取“登录用户本人”的私有仓库与私有贡献；
+    // 查询其他用户时 GitHub 只返回公开数据，前端也会强制公开口径。
+    scope: 'repo',
   })
 
   res.statusCode = 302

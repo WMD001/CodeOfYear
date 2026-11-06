@@ -153,6 +153,8 @@ export interface YearlyReport {
   metrics: MetricCards
   /** 贡献日历数据模式：graphql = 完整贡献口径；rest = 提交近似降级 */
   dataMode: 'graphql' | 'rest'
+  /** 是否包含登录用户本人的私有仓库数据（仅本人 + repo scope 时为 true） */
+  includesPrivate: boolean
   /** 已配置 Token 但 GraphQL 贡献日历获取失败时的原因（用于提示用户排查） */
   graphqlError?: string
   /** 上一年度同口径数据（同比展示用，缺省字段表示不可获取） */

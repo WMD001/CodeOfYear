@@ -24,7 +24,7 @@ import {
   searchPullRequestStats,
   searchReviewedPrCount,
 } from '../api/github-rest'
-import { hasGithubToken } from '../api/http'
+import { fetchViewerLogin, getGithubLogin, hasGithubToken } from '../api/http'
 import { GithubApiError } from '../api/github-errors'
 import { complete, empty, error, unsupported } from '../types/data-status'
 import type {
@@ -127,6 +127,7 @@ async function loadLastYearStats(
   year: number,
   useGraphql: boolean,
   repos: GithubRepository[],
+  publicOnly: boolean,
 ): Promise<LastYearSnapshot | undefined> {
   if (year <= 2009) return undefined // 无法获取 2008 年前的对比数据
   const lastYear = year - 1
@@ -145,9 +146,9 @@ async function loadLastYearStats(
   // 去年 PR / Issue / Review（Search API）
   try {
     const [pr, issue, review] = await Promise.all([
-      searchPullRequestStats(username, from, to),
-      searchIssueStats(username, from, to),
-      searchReviewedPrCount(username, from, to),
+      searchPullRequestStats(username, from, to, publicOnly),
+      searchIssueStats(username, from, to, publicOnly),
+      searchReviewedPrCount(username, from, to, publicOnly),
     ])
     snapshot.pullRequests = pr.total
     snapshot.issues = issue.total
@@ -187,6 +188,17 @@ export async function loadYearlyReport(
   const endDate = yearEndDate(year)
   const generatedAt = new Date().toISOString()
   const hasToken = hasGithubToken()
+  // 只有“登录用户本人”才允许读取私有仓库；他人报告强制公开口径
+  const viewerLogin = hasToken
+    ? (getGithubLogin() ?? (await fetchViewerLogin()))
+    : null
+  const isSelf = Boolean(
+    hasToken &&
+      viewerLogin &&
+      viewerLogin.toLowerCase() === username.toLowerCase(),
+  )
+  const includePrivate = isSelf
+  const publicOnly = !isSelf
 
   /* ---------- 1. 用户资料（404 直接报错） ---------- */
   let profile
@@ -207,7 +219,7 @@ export async function loadYearlyReport(
   onStage?.('repos')
   let repos: GithubRepository[] = []
   try {
-    repos = await getUserRepositories(username)
+    repos = await getUserRepositories(username, includePrivate)
   } catch (err) {
     // 仓库列表失败：其余指标按空仓库继续，最终以数据状态标记
     console.warn(`[gyr] 仓库列表获取失败：${err instanceof Error ? err.message : err}`)
@@ -310,7 +322,13 @@ export async function loadYearlyReport(
 
   // 上一年度同口径数据（best-effort，同比展示用）
   onStage?.('languages')
-  const lastYear = await loadLastYearStats(username, year, useGraphql, nonForkRepos)
+  const lastYear = await loadLastYearStats(
+    username,
+    year,
+    useGraphql,
+    nonForkRepos,
+    publicOnly,
+  )
 
   function countForDate(date: string): number {
     let n = 0
@@ -353,10 +371,10 @@ export async function loadYearlyReport(
   onStage?.('search')
   // Search API 匿名限流仅 10 次/分钟，失败时保留其余数据并把对应指标标为 error
   const [prResult, issueResult, reviewResult, commentResult] = await Promise.all([
-    settle(searchPullRequestStats(username, startDate, endDate)),
-    settle(searchIssueStats(username, startDate, endDate)),
-    settle(searchReviewedPrCount(username, startDate, endDate)),
-    settle(searchCommenterCount(username, startDate, endDate)),
+    settle(searchPullRequestStats(username, startDate, endDate, publicOnly)),
+    settle(searchIssueStats(username, startDate, endDate, publicOnly)),
+    settle(searchReviewedPrCount(username, startDate, endDate, publicOnly)),
+    settle(searchCommenterCount(username, startDate, endDate, publicOnly)),
   ])
   const prStats = prResult.ok ? prResult.value : null
   const issueStats = issueResult.ok ? issueResult.value : null
@@ -368,7 +386,12 @@ export async function loadYearlyReport(
   let mergeDuration: { total: number; sampled: number; avgDays: number | null } | null = null
   if (prStats && prStats.merged > 0) {
     try {
-      mergeDuration = await searchMergedPrDurations(username, startDate, endDate)
+      mergeDuration = await searchMergedPrDurations(
+        username,
+        startDate,
+        endDate,
+        publicOnly,
+      )
     } catch (err) {
       console.warn(`[gyr] PR 合并时长获取失败：${err instanceof Error ? err.message : err}`)
     }
@@ -593,6 +616,7 @@ export async function loadYearlyReport(
   const report: YearlyReport = {
     header,
     dataMode: useGraphql ? 'graphql' : 'rest',
+    includesPrivate: includePrivate && repos.some((repo) => repo.isPrivate),
     graphqlError,
     lastYear,
     user: {

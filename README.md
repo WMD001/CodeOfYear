@@ -27,48 +27,58 @@ React 19 · TypeScript · Vite · Tailwind CSS · Apache ECharts · react-router
 - Star/Fork 年度增量无法可靠还原时，降级展示当前总数并改标指标名
 - 语言占比 = 该语言字节数 ÷ 全部语言字节数；同一代码存在于多个仓库时可能重复计算
 
-### 关于 Token（可选）
+### 关于 GitHub 登录与数据范围
 
 完整贡献日历来自 GitHub GraphQL API，而 GraphQL **必须携带 Token** 才能调用。
-未配置 Token 时（默认匿名模式），贡献日历降级为基于公开仓库提交记录的近似统计，并明确标记"部分"。
 
-如需完整口径：报告页右上角「配置 Token」→ 填入 GitHub Personal Access Token
-（classic 需 `repo` 或 `public_repo` 读取权限）。Token 仅保存在浏览器 localStorage，**不会**出现在分享链接中。
+| 场景 | 凭据 | 数据范围 |
+|---|---|---|
+| 未登录 | 无 | 公开数据（REST + Search，部分指标为近似） |
+| 登录后查本人 | OAuth App（`repo` scope） | 本人公开 + 私有仓库 / 私有贡献 |
+| 登录后查他人 | OAuth App（仍用 token 提高额度） | **强制公开数据**，Search 加 `is:public` |
 
-> 匿名模式下 GitHub API 限流约 60 次/小时（Search API 10 次/分钟），
-> 语言/提交统计按需限量查询并缓存，超出部分标记为"部分统计"。
+- OAuth App 在 `api/auth/github.js` 中申请 `repo` scope；classic OAuth App 的 `repo` 是私有仓库读写权限，仅用于读取本人数据。
+- 私有仓库名称会出现在本人报告中；分享链接不会携带 token，他人打开时仍按自己的登录状态与公开口径查询。
+- 报告包含私有仓库时，页面会显示隐私提示；导出的 PNG 会包含私有仓库名称。
+- 本地开发如果没有 OAuth 服务，可使用首页右上角的「开发 Token」弹窗（仅 `import.meta.env.DEV` 显示，生产构建不包含）。
+
+> 匿名模式下 GitHub API 限流约 60 次/小时（Search API 10 次/分钟）；
+> 登录后 REST 5000 次/小时、Search 30 次/分钟。语言/提交统计按需限量查询并缓存，超出部分标记为"部分统计"。
 
 ## 本地开发
 
 ```bash
 npm install
-npm run dev        # 启动开发服务器
+npm run dev        # 启动开发服务器（不含 OAuth Functions）
 npm run test       # 运行测试（LIVE_API=1 时额外执行真实 API 集成测试）
 npm run build      # 生产构建（输出 dist/）
 npm run preview    # 预览构建产物
 ```
 
-## 部署（Vercel）
+需要本地验证 OAuth 登录时使用 `vercel dev`，并配置 `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET`。
 
-静态站点部署，无需后端：
+## 部署（Vercel）
 
 1. 推送源码到 GitHub 仓库
 2. Vercel → Import Project → 选择仓库
 3. 构建配置：
    - Build Command：`npm run build`
    - Output Directory：`dist`
-4. SPA 路由回退（Vercel 已内置）：直接打开/刷新报告 URL 不会 404
-
-第一版无需环境变量、无需 Vercel Functions。
+4. 配置 GitHub OAuth App：
+   - Authorization callback URL：`https://<你的域名>/api/auth/github/callback`
+   - 环境变量（Vercel Project Settings）：
+     - `GITHUB_OAUTH_CLIENT_ID`
+     - `GITHUB_OAUTH_CLIENT_SECRET`
+5. SPA 路由回退（Vercel 已内置）：直接打开/刷新报告 URL 不会 404
 
 ## 项目结构
 
 ```
 src/
 ├── api/               # GitHub REST / GraphQL 封装（请求、重试、分页、错误归一化）
-├── components/        # ReportHeader / MetricCards / ContributionHeatmap / ContributionHighlights /
-│                      # OtherStatsPanel / RepositoryRanking / LanguageChart / CommitTrend /
-│                      # DevActivityPanel / TokenSetting / DataStatus
+├── components/        # ReportHeader / MetricCards / ContributionHeatmap / WrappedSummary /
+│                      # LoadingScreen / OtherStatsPanel / RepositoryRanking / LanguageChart /
+│                      # CommitTrend / DevActivityPanel / DevTokenDialog / DataStatus
 ├── pages/             # HomePage / ReportPage
 ├── hooks/             # useReport（加载状态机）
 ├── services/          # report-service（编排与降级）/ statistics-service（统计口径）
@@ -81,7 +91,7 @@ tests/                 # 单元测试 / API 测试 / 页面测试
 ## 测试
 
 - 单元测试：日期范围、每日/月度汇总、连续贡献、语言汇总、仓库排行、指标状态
-- API 测试：有效/不存在用户、限流、网络失败、分页、Token 头
+- API 测试：有效/不存在用户、限流、网络失败、分页、Token 头、本人私有 / 他人公开范围
 - 页面测试：查询交互、加载/错误/成功状态、分享与导出入口
 - 真实 API 集成（可选）：`LIVE_API=1 npx vitest run tests/api/live.test.ts`
 

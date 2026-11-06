@@ -115,6 +115,7 @@ function repo(
     stargazersCount: 0,
     forksCount: 0,
     fork: false,
+    isPrivate: false,
     createdAt: '2026-01-01T00:00:00Z',
     pushedAt: null,
     size: 0,

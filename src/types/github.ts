@@ -31,6 +31,8 @@ export interface GithubRepository {
   stargazersCount: number
   forksCount: number
   fork: boolean
+  /** 是否为私有仓库（仅登录本人 + repo scope 时可见） */
+  isPrivate: boolean
   createdAt: string // ISO 时间
   pushedAt: string | null
   size: number

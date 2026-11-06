@@ -37,6 +37,7 @@ vi.mock('../../src/api/github-rest', () => ({
       stargazersCount: 5,
       forksCount: 1,
       fork: false,
+      isPrivate: false,
       createdAt: created,
       pushedAt: '2026-10-01T00:00:00Z',
       size: 10,
@@ -45,7 +46,7 @@ vi.mock('../../src/api/github-rest', () => ({
     return [
       mk('app', '2026-03-01T00:00:00Z'),
       mk('lib', '2025-06-01T00:00:00Z'),
-      mk('legacy', '2020-01-01T00:00:00Z', { fork: true }),
+      mk('legacy', '2020-01-01T00:00:00Z', { fork: true, isPrivate: true }),
     ]
   }),
   getRepositoryCommits: vi.fn(async (_owner: string, repo: string) => {
@@ -168,6 +169,58 @@ describe('report-service 报告组装', () => {
     await expect(loadYearlyReport('nobody-404', 2026)).rejects.toMatchObject({
       kind: 'not_found',
     })
+  })
+
+  it('登录本人时读取私有仓库并标记 includesPrivate', async () => {
+    localStorage.setItem('gyr_github_token', 'test-token')
+    localStorage.setItem('gyr_github_login', 'octocat')
+    const rest = await import('../../src/api/github-rest')
+
+    try {
+      const report = await loadYearlyReport('octocat', 2026)
+
+      expect(report.includesPrivate).toBe(true)
+      expect(vi.mocked(rest.getUserRepositories)).toHaveBeenCalledWith(
+        'octocat',
+        true,
+      )
+      // 本人报告不限制 is:public
+      expect(vi.mocked(rest.searchPullRequestStats)).toHaveBeenCalledWith(
+        'octocat',
+        expect.any(String),
+        expect.any(String),
+        false,
+      )
+    } finally {
+      localStorage.removeItem('gyr_github_token')
+      localStorage.removeItem('gyr_github_login')
+    }
+  })
+
+  it('登录后查询他人时强制公开范围', async () => {
+    localStorage.setItem('gyr_github_token', 'test-token')
+    localStorage.setItem('gyr_github_login', 'someone-else')
+    const rest = await import('../../src/api/github-rest')
+
+    try {
+      const report = await loadYearlyReport('octocat', 2026)
+
+      expect(report.includesPrivate).toBe(false)
+      expect(vi.mocked(rest.getUserRepositories)).toHaveBeenCalledWith(
+        'octocat',
+        false,
+      )
+      // 查他人时 Search 必须加 is:public
+      expect(vi.mocked(rest.searchPullRequestStats)).toHaveBeenCalledWith(
+        'octocat',
+        expect.any(String),
+        expect.any(String),
+        true,
+      )
+    } finally {
+      localStorage.removeItem('gyr_github_token')
+      localStorage.removeItem('gyr_github_login')
+    }
   })
 
   it('无效年份抛出 validation 错误', async () => {

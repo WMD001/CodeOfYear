@@ -150,9 +150,10 @@ export default function DevTokenDialog({ onSaved, size = 'sm' }: Props) {
 
             <p className="mt-2 text-[10.5px] leading-relaxed text-[#6e7681]">
               Token 只保存在当前浏览器的 localStorage，不会上传或写入代码。
-              classic PAT 建议只勾选{' '}
-              <span className="text-[#9aa7b6]">public_repo</span>；fine-grained
-              PAT 建议只给公开仓库只读权限。
+              classic PAT 勾选 <span className="text-[#9aa7b6]">repo</span>{' '}
+              可读取本人私有仓库；只看公开数据建议用{' '}
+              <span className="text-[#9aa7b6]">public_repo</span>。fine-grained PAT
+              只给需要的仓库只读权限。
             </p>
             <a
               href="https://github.com/settings/tokens"

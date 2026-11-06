@@ -42,6 +42,7 @@ function makeReport(): YearlyReport {
       generatedAt: '2026-10-16T00:00:00.000Z',
     },
     dataMode: 'rest',
+    includesPrivate: false,
     user: {
       login: 'octocat',
       displayName: 'Octo Cat',

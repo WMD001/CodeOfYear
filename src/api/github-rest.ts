@@ -42,6 +42,7 @@ const mapRepo = (raw: Record<string, unknown>): GithubRepository => ({
   stargazersCount: Number(raw.stargazers_count ?? 0),
   forksCount: Number(raw.forks_count ?? 0),
   fork: Boolean(raw.fork),
+  isPrivate: Boolean(raw.private),
   createdAt: String(raw.created_at ?? ''),
   pushedAt: (raw.pushed_at as string | null) ?? null,
   size: Number(raw.size ?? 0),
@@ -109,17 +110,25 @@ export async function getUserProfile(username: string): Promise<GithubUserProfil
   return profile
 }
 
-/** 获取用户公开仓库列表（分页，最多 10 页 = 1000 个仓库） */
+/**
+ * 获取仓库列表（分页，最多 10 页 = 1000 个仓库）。
+ * - includePrivate=false：/users/{username}/repos，任何情况下都只返回公开仓库。
+ * - includePrivate=true：/user/repos?visibility=all，仅用于“登录用户本人”的报告，
+ *   需要 OAuth token 具备 repo scope；查询他人时不要传 true。
+ */
 export async function getUserRepositories(
   username: string,
+  includePrivate = false,
 ): Promise<GithubRepository[]> {
-  const key = `repos:${username}`
+  const scope = includePrivate ? 'all' : 'public'
+  const key = `repos:${username}:${scope}`
   const cached = cacheGet<GithubRepository[]>(key)
   if (cached) return cached
 
-  const raw = await githubPaginate<Record<string, unknown>>(
-    `/users/${encodeURIComponent(username)}/repos?sort=created&direction=asc`,
-  )
+  const path = includePrivate
+    ? '/user/repos?affiliation=owner&visibility=all&sort=created&direction=asc'
+    : `/users/${encodeURIComponent(username)}/repos?sort=created&direction=asc`
+  const raw = await githubPaginate<Record<string, unknown>>(path)
   const repos = raw.map(mapRepo)
   cacheSet(key, repos, CACHE_TTL.REPOS)
   return repos
@@ -250,18 +259,20 @@ async function searchCount(query: string): Promise<number> {
   return total
 }
 
-/** 年度内创建的 PR 数量与状态分解 */
+/** 年度内创建的 PR 数量与状态分解；publicOnly=true 时强制只统计公开仓库 */
 export async function searchPullRequestStats(
   username: string,
   from: string,
   to: string,
+  publicOnly = false,
 ): Promise<{
   total: number
   merged: number
   open: number
   closedUnmerged: number
 }> {
-  const base = `author:${username} type:pr created:${from}..${to}`
+  const visibility = publicOnly ? ' is:public' : ''
+  const base = `author:${username} type:pr created:${from}..${to}${visibility}`
   const [total, merged, open] = await Promise.all([
     searchCount(base),
     searchCount(`${base} is:merged`),
@@ -270,13 +281,15 @@ export async function searchPullRequestStats(
   return { total, merged, open, closedUnmerged: Math.max(0, total - merged - open) }
 }
 
-/** 年度内创建的 Issue 数量与状态分解 */
+/** 年度内创建的 Issue 数量与状态分解；publicOnly=true 时强制只统计公开仓库 */
 export async function searchIssueStats(
   username: string,
   from: string,
   to: string,
+  publicOnly = false,
 ): Promise<{ total: number; open: number; closed: number }> {
-  const base = `author:${username} type:issue created:${from}..${to}`
+  const visibility = publicOnly ? ' is:public' : ''
+  const base = `author:${username} type:issue created:${from}..${to}${visibility}`
   const [total, open] = await Promise.all([
     searchCount(base),
     searchCount(`${base} is:open`),
@@ -292,9 +305,11 @@ export async function searchReviewedPrCount(
   username: string,
   from: string,
   to: string,
+  publicOnly = false,
 ): Promise<number> {
+  const visibility = publicOnly ? ' is:public' : ''
   return searchCount(
-    `reviewed-by:${username} type:pr created:${from}..${to}`,
+    `reviewed-by:${username} type:pr created:${from}..${to}${visibility}`,
   )
 }
 
@@ -303,8 +318,10 @@ export async function searchCommenterCount(
   username: string,
   from: string,
   to: string,
+  publicOnly = false,
 ): Promise<number> {
-  return searchCount(`commenter:${username} created:${from}..${to}`)
+  const visibility = publicOnly ? ' is:public' : ''
+  return searchCount(`commenter:${username} created:${from}..${to}${visibility}`)
 }
 
 /**
@@ -316,8 +333,10 @@ export async function searchMergedPrDurations(
   username: string,
   from: string,
   to: string,
+  publicOnly = false,
 ): Promise<{ total: number; sampled: number; avgDays: number | null }> {
-  const base = `author:${username} type:pr is:merged created:${from}..${to}`
+  const visibility = publicOnly ? ' is:public' : ''
+  const base = `author:${username} type:pr is:merged created:${from}..${to}${visibility}`
   const key = `search-pr-durations:${base}`
   const cached = cacheGet<{ total: number; sampled: number; avgDays: number | null }>(key)
   if (cached) return cached

@@ -13,23 +13,80 @@ import {
 } from './github-errors'
 
 const API_BASE = 'https://api.github.com'
+const TOKEN_KEY = 'gyr_github_token'
+const LOGIN_KEY = 'gyr_github_login'
 
 /** 获取用户可选填写的 GitHub Token（仅存浏览器本地） */
 export function getGithubToken(): string | null {
   try {
-    return localStorage.getItem('gyr_github_token')?.trim() || null
+    return localStorage.getItem(TOKEN_KEY)?.trim() || null
   } catch {
     return null
   }
 }
 
-/** 保存用户 Token 到 localStorage */
+/** 保存用户 Token 到 localStorage；清除时同步清除登录用户名 */
 export function setGithubToken(token: string | null): void {
   try {
-    if (token) localStorage.setItem('gyr_github_token', token)
-    else localStorage.removeItem('gyr_github_token')
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token)
+      // Token 变了，旧 login 可能不属于新 Token；报告加载时会通过 /user 重新识别
+      setGithubLogin(null)
+    } else {
+      localStorage.removeItem(TOKEN_KEY)
+      setGithubLogin(null)
+    }
   } catch {
     /* noop */
+  }
+}
+
+/** 当前 OAuth 登录用户的 login（匿名 / 旧 Token 时可能为空） */
+export function getGithubLogin(): string | null {
+  try {
+    return localStorage.getItem(LOGIN_KEY)?.trim() || null
+  } catch {
+    return null
+  }
+}
+
+/** 保存 OAuth 登录用户名 */
+export function setGithubLogin(login: string | null): void {
+  try {
+    if (login) localStorage.setItem(LOGIN_KEY, login)
+    else localStorage.removeItem(LOGIN_KEY)
+  } catch {
+    /* noop */
+  }
+}
+
+/**
+ * 确保拿到当前 Token 对应的 login。
+ * 兼容旧版本已经存了 Token、但没有存 login 的会话；
+ * 请求失败时返回 null，调用方按“非本人 / 公开数据”处理。
+ */
+export async function fetchViewerLogin(): Promise<string | null> {
+  const token = getGithubToken()
+  if (!token) return null
+  const cached = getGithubLogin()
+  if (cached) return cached
+
+  try {
+    const resp = await fetch(`${API_BASE}/user`, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!resp.ok) return null
+    const data = (await resp.json()) as { login?: unknown }
+    const login = typeof data.login === 'string' ? data.login : null
+    if (login) setGithubLogin(login)
+    return login
+  } catch {
+    return null
   }
 }
 
