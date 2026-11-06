@@ -416,19 +416,12 @@ export default function WrappedSummary({
             />
           </div>
 
-          <div
-            className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[10px] text-[#5f6b7a]"
+          <p
+            className="mt-3 text-[10px] text-[#5f6b7a]"
             data-export-ignore="true"
           >
-            <span>数据来源：GitHub 公开 API · 当前查看的是年度摘要</span>
-            <button
-              type="button"
-              onClick={onViewFull}
-              className="rounded-md bg-[#238636] px-2.5 py-1.5 text-[10.5px] text-white transition hover:bg-[#2ea043]"
-            >
-              查看完整仪表盘 →
-            </button>
-          </div>
+            数据来源：GitHub 公开 API · 当前查看的是年度摘要
+          </p>
         </div>
       </div>
     </div>
