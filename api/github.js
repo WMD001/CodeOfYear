@@ -1,8 +1,8 @@
 /**
  * GitHub API 代理：未登录访客的公开数据请求。
  *
- * 背景：前端不能直接持有 PAT，否则会出现在构建产物里。
- * 服务端在这里附加 GITHUB_PAT_TOKEN，只透传公开数据相关接口。
+ * 路由采用平铺形式：/api/github?path=%2Fusers%2FWMD001
+ * 不使用嵌套 catch-all，避免 Vercel 平台路由不匹配导致 404。
  *
  * 安全约束：
  * - GITHUB_PAT_TOKEN 必须是“空 scope”的 classic PAT，或仅公开仓库只读的
@@ -13,7 +13,6 @@
  */
 
 const API_BASE = 'https://api.github.com'
-const PREFIX = '/api/github'
 const ALLOWED_PREFIXES = ['/users/', '/repos/', '/search/']
 const ALLOWED_EXACT = ['/graphql']
 
@@ -23,28 +22,34 @@ function json(res, status, payload) {
   res.end(JSON.stringify(payload))
 }
 
+/** 从 query.path 读取完整的 GitHub API 路径（含 query string） */
+function resolveTarget(req) {
+  const raw = req.query?.path
+  const value = Array.isArray(raw) ? raw[0] : raw
+  if (typeof value !== 'string' || !value.startsWith('/')) return null
+  if (value.includes('..')) return null
+  return value
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
     json(res, 405, { message: 'Method Not Allowed' })
     return
   }
 
-  const rawPath = req.url.startsWith(PREFIX)
-    ? req.url.slice(PREFIX.length)
-    : req.url
-
-  if (!rawPath.startsWith('/') || rawPath.includes('..')) {
+  const target = resolveTarget(req)
+  if (!target) {
     json(res, 400, { message: 'Invalid path' })
     return
   }
 
-  const pathOnly = rawPath.split('?')[0]
+  const pathOnly = target.split('?')[0]
   const allowed =
     ALLOWED_EXACT.includes(pathOnly) ||
     ALLOWED_PREFIXES.some((prefix) => pathOnly.startsWith(prefix))
 
   if (!allowed) {
-    json(res, 403, { message: 'Path not allowed' })
+    json(res, 403, { message: 'Path not allowed', path: pathOnly })
     return
   }
 
@@ -56,6 +61,8 @@ export default async function handler(req, res) {
   const headers = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
+    // GitHub API 要求请求带 User-Agent；Node fetch 的默认 UA 不保证可用
+    'User-Agent': 'GitHub-Yearly-Report',
   }
 
   // 未配置时自动回退为匿名请求，不阻塞页面
@@ -72,7 +79,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const upstream = await fetch(`${API_BASE}${rawPath}`, {
+    const upstream = await fetch(`${API_BASE}${target}`, {
       method: req.method,
       headers,
       body,
@@ -81,6 +88,8 @@ export default async function handler(req, res) {
     const buffer = Buffer.from(await upstream.arrayBuffer())
 
     res.statusCode = upstream.status
+    // 便于线上排查实际转发路径；不含 query，避免暴露搜索词
+    res.setHeader('x-gyr-proxy-path', pathOnly)
     res.setHeader(
       'Content-Type',
       upstream.headers.get('content-type') ?? 'application/json',
@@ -92,6 +101,7 @@ export default async function handler(req, res) {
       message: `GitHub 代理请求失败：${
         err instanceof Error ? err.message : '未知错误'
       }`,
+      path: pathOnly,
     })
   }
 }

@@ -132,13 +132,11 @@ export async function githubRequest<T>(
 ): Promise<T> {
   const token = getGithubToken()
   const retries = options.retries ?? 2
-  // 登录用户直连 GitHub；未登录的生产环境走服务端代理，由代理附加应用级 PAT
-  const base = token
-    ? API_BASE
-    : import.meta.env.PROD
-      ? '/api/github'
-      : API_BASE
-  const endpoint = base + path
+  // 登录用户直连 GitHub；未登录的生产环境走服务端代理，由代理附加应用级 PAT。
+  // 代理使用平铺路由 + path 查询参数，避免 Vercel 嵌套 catch-all 匹配失败。
+  const endpoint = usesGithubProxy()
+    ? `/api/github?path=${encodeURIComponent(path)}`
+    : API_BASE + path
 
   let lastError: GithubApiError | null = null
 

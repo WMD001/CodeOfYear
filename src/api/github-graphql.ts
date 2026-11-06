@@ -15,7 +15,7 @@ import type {
 } from '../types/github'
 
 const GRAPHQL_URL = 'https://api.github.com/graphql'
-const GRAPHQL_PROXY_URL = '/api/github/graphql'
+const GRAPHQL_PROXY_URL = `/api/github?path=${encodeURIComponent('/graphql')}`
 
 const CALENDAR_QUERY = `
 query($login: String!, $from: DateTime!, $to: DateTime!) {
